@@ -18,6 +18,7 @@ def getFullDateMessage():
     ''' returns a string of today's date in UTC like this: "2022-08-01 17:28:44.748691" '''
     return str(dt.datetime.utcnow())
 
+
 class AuthPayload:
     ''' 
         {'message': '2023-09-30 04:06:32.908595', 
@@ -25,12 +26,12 @@ class AuthPayload:
         'address': 'RTEabwWn7zuTxgjwrryYtZv3ELTUidtdF7', 
         'signature': '...'}
     '''
-    
+
     @staticmethod
-    def create(wallet, challenge: str = None) -> AuthPayload:
+    def create(wallet, challenge: str = None) -> 'AuthPayload':
         return AuthPayload(raw=authPayload(wallet, challenge))
 
-    def __init__(self, raw: dict=None):
+    def __init__(self, raw: dict = None):
         self.message: str = raw.get('message')
         self.pubkey: str = raw.get('pubkey')
         self.address: str = raw.get('address')
@@ -38,15 +39,15 @@ class AuthPayload:
 
     def __str__(self):
         return (
-            'Authenticated(
+            'AuthPayload('
             f'\n\tmessage: {self.message},'
             f'\n\tpubkey: {self.pubkey},'
             f'\n\taddress: {self.address},'
             f'\n\tsignature: {self.signature})')
-    
+
     def toJson(self):
         return json.dumps(self.raw)
-    
+
     def toDict(self):
         return {
             'message': self.message,
