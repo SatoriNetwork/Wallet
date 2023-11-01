@@ -1,4 +1,6 @@
+from typing import Union
 from ravencoin.signmessage import RavencoinMessage, VerifyMessage
+
 
 def generateAddress(publicKey: str):
     ''' returns address from pubkey '''
@@ -10,7 +12,13 @@ def generateAddress(publicKey: str):
                 bytearray.fromhex(
                     publicKey))))
 
-def verify(message:'str|RavencoinMessage', signature:'bytes|str', publicKey:str=None, address:str=None):
+
+def verify(
+    message: Union[str, RavencoinMessage],
+    signature: Union[bytes, str],
+    publicKey: str = None,
+    address: str = None
+):
     ''' returns bool success '''
     return VerifyMessage(
         address or generateAddress(publicKey),
