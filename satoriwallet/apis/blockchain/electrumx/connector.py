@@ -1,5 +1,6 @@
 import socket
 import ssl
+import logging
 
 
 class Connector:
@@ -20,4 +21,7 @@ class Connector:
         if self.ssl:
             self.connection = ssl.wrap_socket(self.connection)
         print('connecting to', self.host + ':' + str(self.port))
-        self.connection.connect((self.host, self.port))
+        try:
+            self.connection.connect((self.host, self.port))
+        except Exception as e:
+            logging.debug(f'connection error {e}', print=True)
