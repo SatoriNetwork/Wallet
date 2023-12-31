@@ -25,3 +25,4 @@ class Connector:
             self.connection.connect((self.host, self.port))
         except Exception as e:
             logging.debug(f'connection error {e}', print=True)
+            raise e
