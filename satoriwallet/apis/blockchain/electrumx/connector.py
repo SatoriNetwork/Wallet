@@ -20,9 +20,10 @@ class Connector:
         self.connection.settimeout(self.timeout)
         if self.ssl:
             self.connection = ssl.wrap_socket(self.connection)
-        print('connecting to', self.host + ':' + str(self.port))
         try:
             self.connection.connect((self.host, self.port))
         except Exception as e:
-            logging.debug(f'connection error {e}', print=True)
+            print()
+            logging.debug(
+                f'error connecting to {self.host}:{str(self.port)} {e}', print=True)
             raise e
