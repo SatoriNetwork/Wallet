@@ -23,7 +23,7 @@ class Connector:
         try:
             self.connection.connect((self.host, self.port))
         except Exception as e:
-            print()
-            logging.debug(
-                f'error connecting to {self.host}:{str(self.port)} {e}', print=True)
+            logging.error(
+                f'error connecting to {self.host}:{str(self.port)} {e}',
+                print=True)
             raise e
