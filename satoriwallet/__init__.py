@@ -1,4 +1,4 @@
-from satoriwallet import apis
-from satoriwallet.lib.verify import verify 
+from satoriwallet import api
+from satoriwallet.api import Ravencoin, Evrmore, ElectrumX
+from satoriwallet.lib import ravencoin, evrmore
 from satoriwallet.lib.connection import authPayload
-from satoriwallet.lib.sign import signMessage

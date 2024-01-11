@@ -1,7 +1,9 @@
+from typing import Union
 from ravencoin.wallet import CRavencoinSecret
 from ravencoin.signmessage import RavencoinMessage, SignMessage
 
-def signMessage(key:CRavencoinSecret, message:'str|RavencoinMessage'):
+
+def signMessage(key: CRavencoinSecret, message: Union[str, RavencoinMessage]):
     ''' returns binary signature '''
     return SignMessage(
         key,

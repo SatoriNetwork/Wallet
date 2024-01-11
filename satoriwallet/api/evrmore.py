@@ -1,11 +1,11 @@
 import socket
 import json
 import random
-from satoriwallet.apis.blockchain import ElectrumX
+from satoriwallet.api.blockchain import ElectrumX
 from satoriwallet.lib.structs import TransactionStruct
 
 
-class Ravencoin():
+class Evrmore():
     def __init__(self, address, scripthash, electrumxServers):
         self.address = address
         self.scripthash = scripthash
@@ -13,7 +13,7 @@ class Ravencoin():
         self.balance = None
         self.stats = None
         self.banner = None
-        self.rvn = None
+        self.evr = None
         self.transactionHistory = None
         self.transactions = None
         self.electrumxServers = electrumxServers
@@ -73,7 +73,7 @@ class Ravencoin():
             return
             # raise Exception('unable to connect to electrumx servers')
         if (
-            handshake[0].startswith('ElectrumX Ravencoin')
+            handshake[0].startswith('ElectrumX Evrmore')
             and handshake[1] == assetApiVersion
         ):
             self.banner = interpret(self.conn.send('server.banner'))
@@ -90,9 +90,9 @@ class Ravencoin():
             self.unspentAssets = interpret(self.conn.send(
                 'blockchain.scripthash.listassets',
                 self.scripthash))
-            self.rvnVouts = []
+            self.evrVouts = []
             for tx in self.unspentRvn:
-                self.rvnVouts.append(interpret(self.conn.send(
+                self.evrVouts.append(interpret(self.conn.send(
                     'blockchain.transaction.get',
                     tx.get('tx_hash'), True)).get('vout', [])[tx.get('tx_pos')])
             self.assetVouts = []
@@ -104,7 +104,7 @@ class Ravencoin():
                 x = interpret(self.conn.send(
                     'blockchain.scripthash.get_balance',
                     self.scripthash))
-                self.rvn = x.get('confirmed', 0) + x.get('unconfirmed', 0)
+                self.evr = x.get('confirmed', 0) + x.get('unconfirmed', 0)
                 # >>> b.send("blockchain.scripthash.get_balance", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
                 # b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
                 self.transactionHistory = interpret(self.conn.send(
@@ -135,7 +135,7 @@ class Ravencoin():
 # address
 # send
 # electrum banner
-# about Satori Token - asset on rvn, will be fully convertable to it's own blockchain when Satori is fully decentralized
+# about Satori Token - asset on evr, will be fully convertable to it's own blockchain when Satori is fully decentralized
 
 # >>> b.send("blockchain.scripthash.get_balance", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
 # b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
