@@ -1,6 +1,10 @@
 setuptools==65.6.3
 python-ravencoinlib==0.2.2
-python-evrmorelib==0.2.4
+
+python-evrmorelib
+#==0.2.4
+#python-evrmorelib @ git+https://github.com/SatoriNetwork/python-evrmorelib.git@master
+
 # for linux:
 # sudo apt-get install python3-dev
 # sudo apt-get install build-essential
