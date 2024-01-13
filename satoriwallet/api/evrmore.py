@@ -17,8 +17,7 @@ class Evrmore():
         self.transactionHistory = None
         self.transactions = None
         self.electrumxServers = electrumxServers
-        self.satoriAssetName = 'SATORI/TEST'
-        # self.satoriAssetName = 'SATORI'
+        self.satoriAssetName = 'SATORI'
 
     def connect(self):
         if len(self.electrumxServers) == 0:

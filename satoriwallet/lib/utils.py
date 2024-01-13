@@ -70,3 +70,27 @@ def addressToH160Bytes(address) -> bytes:
     decoded = base58.b58decode(address)
     h160 = decoded[1:-4]
     return h160
+
+
+class AssetTransaction():
+    evr = '657672'
+    rvn = '72766e'
+    t = '74'
+    satoriLen = '07'
+    satori = '5341544f524921'
+
+    @staticmethod
+    def satoriEvrHex() -> str:
+        return (
+            AssetTransaction.evr +
+            AssetTransaction.t +
+            AssetTransaction.satoriLen +
+            AssetTransaction.satori)
+
+    @staticmethod
+    def satoriRvnHex() -> str:
+        return (
+            AssetTransaction.rvn +
+            AssetTransaction.t +
+            AssetTransaction.satoriLen +
+            AssetTransaction.satori)
