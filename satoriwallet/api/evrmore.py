@@ -13,7 +13,7 @@ class Evrmore():
         self.balance = None
         self.stats = None
         self.banner = None
-        self.evr = None
+        self.currency = None
         self.transactionHistory = None
         self.transactions = None
         self.electrumxServers = electrumxServers
@@ -86,7 +86,7 @@ class Evrmore():
             self.stats = interpret(self.conn.send(
                 'blockchain.asset.get_meta',
                 self.satoriAssetName))
-            self.unspentEvr = interpret(self.conn.send(
+            self.unspentCurrency = interpret(self.conn.send(
                 'blockchain.scripthash.listunspent',
                 self.scripthash))
             self.unspentAssets = interpret(self.conn.send(
@@ -100,9 +100,9 @@ class Evrmore():
                 # "value":100000000000000}
                 # at first I thought that tx_hash was the creation of the asset,
                 # but no, it's what I want it to be.
-                self.evrVouts = []
-                for tx in self.unspentEvr:
-                    self.evrVouts.append(interpret(self.conn.send(
+                self.currencyVouts = []
+                for tx in self.unspentCurrency:
+                    self.currencyVouts.append(interpret(self.conn.send(
                         'blockchain.transaction.get',
                         tx.get('tx_hash'), True)).get('vout', []))
                 self.assetVouts = []
@@ -114,7 +114,7 @@ class Evrmore():
                 x = interpret(self.conn.send(
                     'blockchain.scripthash.get_balance',
                     self.scripthash))
-                self.evr = x.get('confirmed', 0) + x.get('unconfirmed', 0)
+                self.currency = x.get('confirmed', 0) + x.get('unconfirmed', 0)
                 # >>> b.send("blockchain.scripthash.get_balance", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
                 # b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
                 self.transactionHistory = interpret(self.conn.send(
