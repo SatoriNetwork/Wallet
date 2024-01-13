@@ -17,6 +17,8 @@ class Evrmore():
         self.transactionHistory = None
         self.transactions = None
         self.electrumxServers = electrumxServers
+        self.satoriAssetName = 'SATORI/TEST'
+        # self.satoriAssetName = 'SATORI'
 
     def connect(self):
         if len(self.electrumxServers) == 0:
@@ -80,26 +82,34 @@ class Evrmore():
             self.balance = interpret(self.conn.send(
                 'blockchain.scripthash.get_asset_balance',
                 self.scripthash)
-            ).get('confirmed', {}).get('SATORI', 0)
+            ).get('confirmed', {}).get(self.satoriAssetName, 0)
             self.stats = interpret(self.conn.send(
                 'blockchain.asset.get_meta',
-                'SATORI'))
-            self.unspentRvn = interpret(self.conn.send(
+                self.satoriAssetName))
+            self.unspentEvr = interpret(self.conn.send(
                 'blockchain.scripthash.listunspent',
                 self.scripthash))
             self.unspentAssets = interpret(self.conn.send(
                 'blockchain.scripthash.listassets',
                 self.scripthash))
-            self.evrVouts = []
-            for tx in self.unspentRvn:
-                self.evrVouts.append(interpret(self.conn.send(
-                    'blockchain.transaction.get',
-                    tx.get('tx_hash'), True)).get('vout', [])[tx.get('tx_pos')])
-            self.assetVouts = []
-            for tx in self.unspentAssets:
-                self.assetVouts.append(interpret(self.conn.send(
-                    'blockchain.transaction.get',
-                    tx.get('tx_hash'), True)).get('vout', [])[tx.get('tx_pos')])
+            if allWalletInfo:
+                # I don't actually have to get the vouts because listassets
+                # gives me everything I need to make a transaction:
+                # {"tx_hash":"a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3",
+                # "tx_pos":3,"height":2292586,"name":"SATORI",
+                # "value":100000000000000}
+                # at first I thought that tx_hash was the creation of the asset,
+                # but no, it's what I want it to be.
+                self.evrVouts = []
+                for tx in self.unspentEvr:
+                    self.evrVouts.append(interpret(self.conn.send(
+                        'blockchain.transaction.get',
+                        tx.get('tx_hash'), True)).get('vout', []))
+                self.assetVouts = []
+                for tx in self.unspentAssets:
+                    self.assetVouts.append(interpret(self.conn.send(
+                        'blockchain.transaction.get',
+                        tx.get('tx_hash'), True)).get('vout', []))
             if allWalletInfo:
                 x = interpret(self.conn.send(
                     'blockchain.scripthash.get_balance',

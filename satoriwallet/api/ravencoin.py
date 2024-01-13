@@ -91,16 +91,24 @@ class Ravencoin():
             self.unspentAssets = interpret(self.conn.send(
                 'blockchain.scripthash.listassets',
                 self.scripthash))
-            self.rvnVouts = []
-            for tx in self.unspentRvn:
-                self.rvnVouts.append(interpret(self.conn.send(
-                    'blockchain.transaction.get',
-                    tx.get('tx_hash'), True)).get('vout', [])[tx.get('tx_pos')])
-            self.assetVouts = []
-            for tx in self.unspentAssets:
-                self.assetVouts.append(interpret(self.conn.send(
-                    'blockchain.transaction.get',
-                    tx.get('tx_hash'), True)).get('vout', [])[tx.get('tx_pos')])
+            if allWalletInfo:
+                # I don't actually have to get the vouts because listassets
+                # gives me everything I need to make a transaction:
+                # {"tx_hash":"a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3",
+                # "tx_pos":3,"height":2292586,"name":"SATORI",
+                # "value":100000000000000}
+                # at first I thought that tx_hash was the creation of the asset,
+                # but no, it's what I want it to be.
+                self.rvnVouts = []
+                for tx in self.unspentRvn:
+                    self.rvnVouts.append(interpret(self.conn.send(
+                        'blockchain.transaction.get',
+                        tx.get('tx_hash'), True)))
+                self.assetVouts = []
+                for tx in self.unspentAssets:
+                    self.assetVouts.append(interpret(self.conn.send(
+                        'blockchain.transaction.get',
+                        tx.get('tx_hash'), True)))
             if allWalletInfo:
                 x = interpret(self.conn.send(
                     'blockchain.scripthash.get_balance',
@@ -155,7 +163,7 @@ class Ravencoin():
             self.sentTx = interpret(self.conn.send(
                 'blockchain.transaction.broadcast',
                 rawTx))
-            
+
 # transaction history
 # private key
 # qr address

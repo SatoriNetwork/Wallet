@@ -12,8 +12,11 @@ class Connector:
         self.timeout = timeout
         self.network = network
         self.connection = None
-        print(self.host, self.port, self.ssl, self.timeout, self.network)
+        print(f'{self.host}:{self.port}', self.network)
         self._connect()
+
+    def connected(self) -> bool:
+        return self.connection is not None and self.connection.connected
 
     def _connect(self):
 
@@ -32,6 +35,5 @@ class Connector:
             self.connection.connect((self.host, self.port))
         except Exception as e:
             logging.error(
-                f'error connecting to {self.host}:{str(self.port)} {e}',
-                print=True)
+                f'error connecting to {self.host}:{str(self.port)} {e}')
             raise e
