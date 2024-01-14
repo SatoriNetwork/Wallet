@@ -73,7 +73,7 @@ class ElectrumXAPI():
 
     @staticmethod
     def interpret(x: str):
-        print(x.decode('utf-8'))
+        # print(x.decode('utf-8'))
         return json.loads(x.decode('utf-8')).get('result', None)
 
     def get(self, allWalletInfo=False):
@@ -102,6 +102,14 @@ class ElectrumXAPI():
         if not self.handshake():
             return False
         self.banner = ElectrumXAPI.interpret(self.conn.send('server.banner'))
+        currency = ElectrumXAPI.interpret(self.conn.send(
+            'blockchain.scripthash.get_balance',
+            self.scripthash))
+        self.currency = (
+            currency.get('confirmed', 0) +
+            currency.get('unconfirmed', 0))
+        # >>> b.send("blockchain.scripthash.get_balance", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
+        # b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
         self.balance = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.scripthash.get_asset_balance',
             self.scripthash)
@@ -109,17 +117,26 @@ class ElectrumXAPI():
         self.stats = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.asset.get_meta',
             'SATORI'))
+        self.transactionHistory = ElectrumXAPI.interpret(self.conn.send(
+            'blockchain.scripthash.get_history',
+            self.scripthash))
+        # b.send("blockchain.scripthash.get_history", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
+        # b'{"jsonrpc":"2.0","result":[{"tx_hash":"a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3","height":2292586}],"id":1656046324946}\n'
         self.unspentCurrency = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.scripthash.listunspent',
             self.scripthash))
         self.unspentAssets = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.scripthash.listassets',
             self.scripthash))
-        self.transactionHistory = ElectrumXAPI.interpret(self.conn.send(
-            'blockchain.scripthash.get_history',
-            self.scripthash))
-        # b.send("blockchain.scripthash.get_history", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
-        # b'{"jsonrpc":"2.0","result":[{"tx_hash":"a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3","height":2292586}],"id":1656046324946}\n'
+        # we don't actually need this, we can regenerate the asset script.
+        # self.assetTransactions = []
+        # for unspentAssetHash in [
+        #    ua.get('tx_hash') for ua in self.unspentAssets
+        #    if ua.get('tx_hash') is not None
+        # ]:
+        #    self.assetTransactions.append(ElectrumXAPI.interpret(self.conn.send(
+        #        'blockchain.transaction.get',
+        #        unspentAssetHash, True)))
         if allWalletInfo:
             # I don't actually have to get the vouts because listassets
             # gives me everything I need to make a transaction:
@@ -139,12 +156,6 @@ class ElectrumXAPI():
                     'blockchain.transaction.get',
                     tx.get('tx_hash'), True)))
         if allWalletInfo:
-            x = ElectrumXAPI.interpret(self.conn.send(
-                'blockchain.scripthash.get_balance',
-                self.scripthash))
-            self.currency = x.get('confirmed', 0) + x.get('unconfirmed', 0)
-            # >>> b.send("blockchain.scripthash.get_balance", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
-            # b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
             self.transactions = []
             for tx in self.transactionHistory:
                 raw = ElectrumXAPI.interpret(self.conn.send(
@@ -163,9 +174,14 @@ class ElectrumXAPI():
 
     def broadcast(self, rawTx: str):
         if self.handshake():
-            self.sentTx = ElectrumXAPI.interpret(self.conn.send(
+            print('rawTx', rawTx)
+            sent = self.conn.send(
                 'blockchain.transaction.broadcast',
-                rawTx))
+                rawTx)
+            print('sent', sent)
+            print('sent', sent)
+            self.sentTx = ElectrumXAPI.interpret(sent)
+            print('self.sentTx', self.sentTx)
         return self.sentTx
 
 # transaction history

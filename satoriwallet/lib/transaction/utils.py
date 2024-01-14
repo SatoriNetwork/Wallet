@@ -3,7 +3,14 @@ class TxUtils():
 
     @ staticmethod
     def estimatedFee(inputCount: int = 0, outputCount: int = 0, feeRate: int = 150000):
-        ''' 0.00150000 rvn per item as simple over-estimate '''
+        '''
+        0.00150000 rvn per item as simple over-estimate
+        this fee is on a per input/output basis and it should cover a asset 
+        output which is larger than a currency output. therefore it should 
+        always be sufficient for our purposes. usually we're sending 1 asset
+        vin and 1 asset vout, and 1 currency vin and 1 currency vout.
+        '''
+
         return (inputCount + outputCount) * feeRate
 
     @staticmethod
@@ -30,6 +37,16 @@ class TxUtils():
     def asSats(amount: float) -> int:
         from evrmore.core import COIN
         return int(amount * COIN)
+
+    @staticmethod
+    def asAmount(sats: int, divisibility: int = 8) -> float:
+        from evrmore.core import COIN
+        result = sats / COIN
+        if result == 0:
+            return 0
+        if divisibility == 0:
+            return int(result)
+        return round(result, divisibility)
 
     @staticmethod
     def intToLittleEndianHex(number: int) -> str:
@@ -80,8 +97,8 @@ class AssetTransaction():
     evr = '657672'
     rvn = '72766e'
     t = '74'
-    satoriLen = '07'
-    satori = '5341544f524921'
+    satoriLen = '06'
+    satori = '5341544f5249'
 
     @staticmethod
     def satoriHex(currency: str) -> str:

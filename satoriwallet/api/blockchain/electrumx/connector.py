@@ -36,6 +36,8 @@ class Connector:
         except (socket.error, OSError) as e:
             # An error in recv likely means the socket is closed
             return False
+        except Exception as e:
+            return False
 
     def _connect(self):
 
