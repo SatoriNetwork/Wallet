@@ -1,6 +1,7 @@
 import socket
 import ssl
 import logging
+import select
 
 
 class Connector:
@@ -16,7 +17,25 @@ class Connector:
         self._connect()
 
     def connected(self) -> bool:
-        return self.connection is not None and self.connection.connected
+        # problem:   File "/Satori/Wallet/satoriwallet/api/blockchain/electrumx/connector.py", line 19, in connected
+        #           return self.connection is not None and self.connection.connected
+        #           AttributeError: 'SSLSocket' object has no attribute 'connected
+        # return self.connection is not None and self.connection.connected
+        if self.connection is None:
+            return False
+        try:
+            # Use select to check if the socket is readable
+            # which would imply it's either still connected or has been closed
+            ready = select.select([self.connection], [], [], 0.5)
+            if ready[0]:
+                # Perform a non-blocking check
+                # If recv returns an empty string, the socket is closed
+                data = self.connection.recv(16, socket.MSG_DONTWAIT)
+                return len(data) != 0
+            return True  # No data, but socket is not closed
+        except (socket.error, OSError) as e:
+            # An error in recv likely means the socket is closed
+            return False
 
     def _connect(self):
 

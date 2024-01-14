@@ -7,7 +7,7 @@ from satoriwallet.lib.structs import TransactionStruct
 
 
 class ElectrumXAPI():
-    def __init__(self, address: str, scripthash: str, electrumxServers: list[str], chain: str):
+    def __init__(self, address: str, scripthash: str, servers: list[str], chain: str):
         self.chain = chain
         self.address = address
         self.scripthash = scripthash
@@ -18,16 +18,16 @@ class ElectrumXAPI():
         self.currency = None
         self.transactionHistory = None
         self.transactions = None
-        self.electrumxServers = electrumxServers
+        self.servers = servers
         self.lastHandshake = None
 
     def connected(self):
-        return self.conn.connected()
+        return self.conn is not None and self.conn.connected()
 
     def connect(self):
-        if len(self.electrumxServers) == 0:
+        if len(self.servers) == 0:
             return
-        hostPort = random.choice(self.electrumxServers)
+        hostPort = random.choice(self.servers)
         return ElectrumX(
             host=hostPort.split(':')[0],
             port=int(hostPort.split(':')[1]),
@@ -115,6 +115,11 @@ class ElectrumXAPI():
         self.unspentAssets = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.scripthash.listassets',
             self.scripthash))
+        self.transactionHistory = ElectrumXAPI.interpret(self.conn.send(
+            'blockchain.scripthash.get_history',
+            self.scripthash))
+        # b.send("blockchain.scripthash.get_history", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
+        # b'{"jsonrpc":"2.0","result":[{"tx_hash":"a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3","height":2292586}],"id":1656046324946}\n'
         if allWalletInfo:
             # I don't actually have to get the vouts because listassets
             # gives me everything I need to make a transaction:
@@ -140,11 +145,6 @@ class ElectrumXAPI():
             self.currency = x.get('confirmed', 0) + x.get('unconfirmed', 0)
             # >>> b.send("blockchain.scripthash.get_balance", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
             # b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
-            self.transactionHistory = ElectrumXAPI.interpret(self.conn.send(
-                'blockchain.scripthash.get_history',
-                self.scripthash))
-            # b.send("blockchain.scripthash.get_history", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
-            # b'{"jsonrpc":"2.0","result":[{"tx_hash":"a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3","height":2292586}],"id":1656046324946}\n'
             self.transactions = []
             for tx in self.transactionHistory:
                 raw = ElectrumXAPI.interpret(self.conn.send(
