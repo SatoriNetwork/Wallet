@@ -46,6 +46,7 @@ class ElectrumXAPI():
             # we're still connected.
             return True
         i = 0
+        self.conn = None
         while self.conn == None and i < 5:
             i += 1
             self.conn = self.connect()
