@@ -113,10 +113,10 @@ class AssetTransaction():
             AssetTransaction.t +
             AssetTransaction.satoriLen +
             AssetTransaction.satori)
-        
+
     @staticmethod
     def memoHex(memo: str) -> str:
-        return memo.encode('utf-8').hex()
+        return memo.encode().hex()
 
 
 class Validate():
