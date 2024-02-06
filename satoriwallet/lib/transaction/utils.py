@@ -5,7 +5,7 @@ import math
 class TxUtils():
     ''' utility methods for transactions '''
 
-    @ staticmethod
+    @staticmethod
     def estimatedFee(inputCount: int = 0, outputCount: int = 0, feeRate: int = 150000) -> int:
         '''
         0.00150000 rvn per item as simple over-estimate
@@ -49,7 +49,12 @@ class TxUtils():
             return 0
         if divisibility == 0:
             return int(result)
-        return math.floor(result, divisibility)
+        return TxUtils.floor(result, divisibility)
+
+    @staticmethod
+    def floor(amount: float, divisibility: int) -> float:
+        multiplier = 10 ** divisibility
+        return math.floor(amount * multiplier) / multiplier
 
     @staticmethod
     def isAmountDivisibilityValid(amount: float, divisibility: int = 8) -> bool:
@@ -73,8 +78,7 @@ class TxUtils():
         # truncatedAmountStr = formatString.format(amount)
         # return float(truncatedAmountStr)
         # I prefer a direct approach:
-        multiplier = 10 ** divisibility
-        return math.floor(amount * multiplier) / multiplier
+        return TxUtils.floor(amount, divisibility)
 
     @staticmethod
     def intToLittleEndianHex(number: int) -> str:
