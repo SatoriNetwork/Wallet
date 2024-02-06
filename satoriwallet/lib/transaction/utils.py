@@ -1,8 +1,12 @@
+from typing import Union
+import math
+
+
 class TxUtils():
     ''' utility methods for transactions '''
 
     @ staticmethod
-    def estimatedFee(inputCount: int = 0, outputCount: int = 0, feeRate: int = 150000):
+    def estimatedFee(inputCount: int = 0, outputCount: int = 0, feeRate: int = 150000) -> int:
         '''
         0.00150000 rvn per item as simple over-estimate
         this fee is on a per input/output basis and it should cover a asset 
@@ -10,7 +14,6 @@ class TxUtils():
         always be sufficient for our purposes. usually we're sending 1 asset
         vin and 1 asset vout, and 1 currency vin and 1 currency vout.
         '''
-
         return (inputCount + outputCount) * feeRate
 
     @staticmethod
@@ -46,7 +49,32 @@ class TxUtils():
             return 0
         if divisibility == 0:
             return int(result)
-        return round(result, divisibility)
+        return math.floor(result, divisibility)
+
+    @staticmethod
+    def isAmountDivisibilityValid(amount: float, divisibility: int = 8) -> bool:
+        # Multiply the amount by 10^divisibility to shift all the decimals
+        # then check if the result is essentially an integer by comparing it with its floor value
+        shifted = amount * (10 ** divisibility)
+        return shifted == int(shifted)
+
+    @staticmethod
+    def roundDownToDivisibility(amount: float, divisibility: int = 8) -> Union[int, float]:
+        ''' 
+        This function truncates the given amount to the allowed number of 
+        decimal places as defined by the asset's divisibility. 
+        It returns the truncated amount.
+        '''
+        if divisibility == 0:
+            return int(amount)
+        # # Use string formatting to truncate to the allowed number of decimal
+        # # places and then convert back to float
+        # formatString = f"{{:.{divisibility}f}}"
+        # truncatedAmountStr = formatString.format(amount)
+        # return float(truncatedAmountStr)
+        # I prefer a direct approach:
+        multiplier = 10 ** divisibility
+        return math.floor(amount * multiplier) / multiplier
 
     @staticmethod
     def intToLittleEndianHex(number: int) -> str:
