@@ -1,5 +1,7 @@
 from typing import Union
 import math
+import hashlib
+import base58
 
 
 class TxUtils():
@@ -125,9 +127,10 @@ class TxUtils():
         return h160
 
     @staticmethod
-    def hash160ToAddress(self, hexStr: str, networkByte: bytes = b'\x00'):
+    def hash160ToAddress(self, pubKeyHash: Union[str, bytes], networkByte: bytes = b'\x00'):
         # Step 1: Add network byte (0x00 for Bitcoin mainnet P2PKH)
-        pubKeyHash = bytes.fromhex(hexStr)
+        if isinstance(pubKeyHash, str):
+            pubKeyHash = bytes.fromhex(pubKeyHash)
         step1 = networkByte + pubKeyHash
         # Step 2 & 3: Perform SHA-256 twice and take the first 4 bytes as checksum
         sha256_1 = hashlib.sha256(step1).digest()
