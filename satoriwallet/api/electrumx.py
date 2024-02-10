@@ -75,7 +75,13 @@ class ElectrumXAPI():
     @staticmethod
     def interpret(x: str):
         # print(x.decode('utf-8'))
-        return json.loads(x.decode('utf-8')).get('result', None)
+        decoded = json.loads(x.decode('utf-8'))
+        if 'result' in decoded.keys():
+            return decoded.get('result', None)
+        if 'error' in decoded.keys():
+            return decoded.get('error', None)
+        else:
+            return decoded
 
     def get(self, allWalletInfo=False):
         '''
