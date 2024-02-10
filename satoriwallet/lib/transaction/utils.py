@@ -127,7 +127,7 @@ class TxUtils():
         return h160
 
     @staticmethod
-    def hash160ToAddress(self, pubKeyHash: Union[str, bytes], networkByte: bytes = b'\x00'):
+    def hash160ToAddress(pubKeyHash: Union[str, bytes], networkByte: bytes = b'\x00'):
         # Step 1: Add network byte (0x00 for Bitcoin mainnet P2PKH)
         if isinstance(pubKeyHash, str):
             pubKeyHash = bytes.fromhex(pubKeyHash)
