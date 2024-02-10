@@ -124,6 +124,21 @@ class TxUtils():
         h160 = decoded[1:-4]
         return h160
 
+    @staticmethod
+    def hash160ToAddress(self, hexStr: str, networkByte: bytes = b'\x00'):
+        # Step 1: Add network byte (0x00 for Bitcoin mainnet P2PKH)
+        pubKeyHash = bytes.fromhex(hexStr)
+        step1 = networkByte + pubKeyHash
+        # Step 2 & 3: Perform SHA-256 twice and take the first 4 bytes as checksum
+        sha256_1 = hashlib.sha256(step1).digest()
+        sha256_2 = hashlib.sha256(sha256_1).digest()
+        checksum = sha256_2[:4]
+        # Step 4: Append checksum
+        step4 = step1 + checksum
+        # Step 5: Base58Check encode
+        address = base58.b58encode(step4)
+        return address.decode()
+
 
 class AssetTransaction():
     evr = '657672'
