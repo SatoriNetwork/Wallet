@@ -175,14 +175,8 @@ class ElectrumXAPI():
 
     def broadcast(self, rawTx: str):
         if self.handshake():
-            print('rawTx', rawTx)
-            sent = self.conn.send(
-                'blockchain.transaction.broadcast',
-                rawTx)
-            print('sent', sent)
-            print('sent', sent)
+            sent = self.conn.send('blockchain.transaction.broadcast', rawTx)
             self.sentTx = ElectrumXAPI.interpret(sent)
-            print('self.sentTx', self.sentTx)
         return self.sentTx
 
 # transaction history
