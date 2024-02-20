@@ -1,3 +1,4 @@
+from typing import Union
 import socket
 import json
 import random
