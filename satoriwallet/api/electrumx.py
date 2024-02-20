@@ -7,6 +7,7 @@ from satoriwallet.api.blockchain import ElectrumX
 from satoriwallet.lib.structs import TransactionStruct
 
 
+
 class ElectrumXAPI():
     def __init__(self, address: str, scripthash: str, servers: list[str], chain: str):
         self.chain = chain
@@ -193,11 +194,14 @@ class ElectrumXAPI():
         i = 0
         while lastAddresses != addresses:
             lastAddresses = addresses
+            x = ElectrumXAPI.interpret(self.conn.send(
+                    'blockchain.asset.list_addresses_by_asset',
+                    'SATORI', False, 1000, i))
+            print('addresses', addresses)
+            print('X--------', x)
             addresses = {
                 **addresses,
-                **ElectrumXAPI.interpret(self.conn.send(
-                    'blockchain.asset.list_addresses_by_asset',
-                    'SATORI', False, 1000, i))}
+                **x}
             i = i + 1000
             time.sleep(1)  # incase there's a huge number we throttle
         return addresses
