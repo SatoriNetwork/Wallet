@@ -127,13 +127,9 @@ class ElectrumXAPI():
         self.stats = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.asset.get_meta',
             'SATORI'))
-        try:
-            self.transactionHistory = ElectrumXAPI.interpret(self.conn.send(
-                'blockchain.scripthash.get_history',
-                self.scripthash))
-        except Exception as e:
-            print('error getting transaction history', e)
-            self.transactionHistory = []
+        self.transactionHistory = ElectrumXAPI.interpret(self.conn.send(
+            'blockchain.scripthash.get_history',
+            self.scripthash))
         # b.send("blockchain.scripthash.get_history", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
         # b'{"jsonrpc":"2.0","result":[{"tx_hash":"a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3","height":2292586}],"id":1656046324946}\n'
         self.unspentCurrency = ElectrumXAPI.interpret(self.conn.send(
