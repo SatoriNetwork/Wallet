@@ -75,7 +75,7 @@ class ElectrumXAPI():
 
     @staticmethod
     def interpret(x: str):
-        # print(x.decode('utf-8'))
+        print(x.decode('utf-8'))
         decoded = json.loads(x.decode('utf-8'))
         if 'result' in decoded.keys():
             return decoded.get('result', None)
