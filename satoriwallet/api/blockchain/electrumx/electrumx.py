@@ -22,7 +22,7 @@ class ElectrumX(Connector):
     def _receive(self):
         buffer = ''
         while True:
-            raw = self.connection.recv(1024*16)
+            raw = self.connection.recv(1024*16).decode('utf-8')
             buffer += raw
             if '\n' in raw:
                 # Assuming messages are newline-terminated, split on the first newline.
