@@ -74,13 +74,15 @@ class ElectrumXAPI():
         return False
 
     @staticmethod
-    def interpret(x: str):
-        print(x.decode('utf-8'))
-        decoded = json.loads(x.decode('utf-8'))
+    def interpret(decoded: dict):
+        # print(x.decode('utf-8'))
+        # decoded = json.loads(x.decode('utf-8'))
+        if decoded is None:
+            return None
         if 'result' in decoded.keys():
-            return decoded.get('result', None)
+            return decoded.get('result')
         if 'error' in decoded.keys():
-            return decoded.get('error', None)
+            return decoded.get('error')
         else:
             return decoded
 
