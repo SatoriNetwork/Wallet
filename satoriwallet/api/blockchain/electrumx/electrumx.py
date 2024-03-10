@@ -30,5 +30,6 @@ class ElectrumX(Connector):
         ) + '\n'
         payload = payload.encode()
         self.log.log(5, "send {} {}".format(method, args))
+        print('SEND: ', payload)
         self.connection.send(payload)
         return self._receive()
