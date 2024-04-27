@@ -85,7 +85,8 @@ class TxUtils():
     @staticmethod
     def intToLittleEndianHex(number: int) -> str:
         '''
-        100000000 -> "00e1f50500000000"
+
+        100000000 -> "00e1f505" # does not include padding on end: "00000000"
         # Example
         number = 100000000
         little_endian_hex = intToLittleEndianHex(number)
