@@ -17,7 +17,7 @@ def authPayload(wallet, challenge: str = None):
 
 def getFullDateMessage():
     ''' returns a string of today's date in UTC like this: "2022-08-01 17:28:44.748691" '''
-    return str(dt.datetime.now(dt.UTC)).split('+')[0]
+    return str(dt.datetime.utcnow()).split('+')[0]
 
 
 class AuthPayload:
