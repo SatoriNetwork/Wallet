@@ -71,7 +71,7 @@ class TxUtils():
 
     @staticmethod
     def roundSatsDownToDivisibility(sats: int, divisibility: int = 8) -> bool:
-        if isSatsDivisibilityValid(sats, divisibility):
+        if TxUtils.isSatsDivisibilityValid(sats, divisibility):
             return sats
         ending = '0' * (8 - divisibility)
         return int(str(sats)[0:-len(ending)] + ending)
