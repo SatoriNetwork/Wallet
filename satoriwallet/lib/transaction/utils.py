@@ -66,6 +66,17 @@ class TxUtils():
         return shifted == int(shifted)
 
     @staticmethod
+    def isSatsDivisibilityValid(sats: int, divisibility: int = 8) -> bool:
+        return str(sats).endswith('0' * (8 - divisibility))
+
+    @staticmethod
+    def roundSatsDownToDivisibility(sats: int, divisibility: int = 8) -> bool:
+        if isSatsDivisibilityValid(sats, divisibility):
+            return sats
+        ending = '0' * (8 - divisibility)
+        return int(str(sats)[0:-len(ending)] + ending)
+
+    @staticmethod
     def roundDownToDivisibility(amount: float, divisibility: int = 8) -> Union[int, float]:
         ''' 
         This function truncates the given amount to the allowed number of 
