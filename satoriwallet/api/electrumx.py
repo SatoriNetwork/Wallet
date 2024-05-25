@@ -111,7 +111,6 @@ class ElectrumXAPI():
         #    return self.balance / int('1' + ('0'*invertDivisibility(int(self.stats.get('divisions', 8)))) )
         if not self.handshake():
             return False
-        self.banner = ElectrumXAPI.interpret(self.conn.send('server.banner'))
         currency = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.scripthash.get_balance',
             self.scripthash))
@@ -127,6 +126,12 @@ class ElectrumXAPI():
         self.stats = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.asset.get_meta',
             'SATORI'))
+        try:
+            self.banner = ElectrumXAPI.interpret(
+                self.conn.send('server.banner'))
+        except Exception as e:
+            print('error getting banner', e)
+            self.banner = "timeout error - unable to get banner"
         try:
             self.transactionHistory = ElectrumXAPI.interpret(self.conn.send(
                 'blockchain.scripthash.get_history',
@@ -210,8 +215,6 @@ class ElectrumXAPI():
             x = ElectrumXAPI.interpret(self.conn.send(
                 'blockchain.asset.list_addresses_by_asset',
                 'SATORI', False, 1000, i))
-            print('addresses', addresses)
-            print('X--------', x)
             addresses = {
                 **addresses,
                 **x}
