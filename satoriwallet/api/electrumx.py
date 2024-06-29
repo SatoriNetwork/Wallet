@@ -199,7 +199,7 @@ class ElectrumXAPI():
             'blockchain.scripthash.get_asset_balance',
             scripthash)).get('confirmed', {}).get('SATORI', 0)
 
-    def getAssetHolders(self) -> Union[dict[str, int], bool]:
+    def getAssetHolders(self, targetAddress: Union[str, None] = None) -> Union[dict[str, int], bool]:
         '''
         gives back a full list of wallets and their amounts of a particular asset. 
         loops until it gets the full list.
@@ -215,9 +215,11 @@ class ElectrumXAPI():
             x = ElectrumXAPI.interpret(self.conn.send(
                 'blockchain.asset.list_addresses_by_asset',
                 'SATORI', False, 1000, i))
-            addresses = {
-                **addresses,
-                **x}
+            if targetAddress is not None and targetAddress in x.keys():
+                return {targetAddress: x[targetAddress]}
+            addresses = {**addresses, **x}
+            if len(x) < 1000:
+                break
             i = i + 1000
             time.sleep(1)  # incase there's a huge number we throttle
         return addresses
