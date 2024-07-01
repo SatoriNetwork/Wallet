@@ -137,6 +137,9 @@ class ElectrumXAPI():
         except Exception as e:
             print('error getting transaction history', e)
             self.transactionHistory = []
+        self.unspentCurrency = ElectrumXAPI.interpret(self.conn.send(
+            'blockchain.scripthash.listunspent',
+            self.scripthash))
         if self.chain == 'Evrmore':
             # {'jsonrpc': '2.0', 'result': {'confirmed': 0, 'unconfirmed': 0}, 'id': 1719672672565}
             self.balances = ElectrumXAPI.interpret(self.conn.send(
@@ -145,9 +148,6 @@ class ElectrumXAPI():
                 'SATORI'))
             self.balance = self.balances.get(
                 'confirmed', 0) + self.balances.get('unconfirmed', 0)
-            self.unspentCurrency = ElectrumXAPI.interpret(self.conn.send(
-                'blockchain.scripthash.listunspent',
-                self.scripthash))
             # {'jsonrpc': '2.0', 'result': [{'tx_hash': 'bea0e23c0aa8a4f1e1bb8cda0c6f487a3c0c0e7a54c47b6e1883036898bdc101', 'tx_pos': 0, 'height': 868584, 'asset': 'KINKAJOU/GROOMER1', 'value': 100000000}], 'id': 1719672839478}
             self.unspentAssets = ElectrumXAPI.interpret(self.conn.send(
                 'blockchain.scripthash.listunspent',
@@ -158,9 +158,6 @@ class ElectrumXAPI():
                 'blockchain.scripthash.get_asset_balance',
                 self.scripthash)
             ).get('confirmed', {}).get('SATORI', 0)
-            self.unspentCurrency = ElectrumXAPI.interpret(self.conn.send(
-                'blockchain.scripthash.listunspent',
-                self.scripthash))
             self.unspentAssets = ElectrumXAPI.interpret(self.conn.send(
                 'blockchain.scripthash.listassets',
                 self.scripthash))
