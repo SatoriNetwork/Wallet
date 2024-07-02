@@ -115,8 +115,8 @@ class ElectrumXAPI():
             'blockchain.scripthash.get_balance',
             self.scripthash))
         self.currency = (
-            currency.get('confirmed', 0) +
-            currency.get('unconfirmed', 0))
+            (currency or {}).get('confirmed', 0) +
+            (currency or {}).get('unconfirmed', 0))
         # >>> b.send("blockchain.scripthash.get_balance", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
         # b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
         self.stats = ElectrumXAPI.interpret(self.conn.send(
