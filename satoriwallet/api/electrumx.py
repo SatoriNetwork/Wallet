@@ -115,14 +115,10 @@ class ElectrumXAPI():
             'blockchain.scripthash.get_balance',
             self.scripthash))
         self.currency = (
-            currency.get('confirmed', 0) +
-            currency.get('unconfirmed', 0))
+            (currency or {}).get('confirmed', 0) +
+            (currency or {}).get('unconfirmed', 0))
         # >>> b.send("blockchain.scripthash.get_balance", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
         # b'{"jsonrpc":"2.0","result":{"confirmed":18193623332178,"unconfirmed":0},"id":1656046285682}\n'
-        self.balance = ElectrumXAPI.interpret(self.conn.send(
-            'blockchain.scripthash.get_asset_balance',
-            self.scripthash)
-        ).get('confirmed', {}).get('SATORI', 0)
         self.stats = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.asset.get_meta',
             'SATORI'))
@@ -133,20 +129,39 @@ class ElectrumXAPI():
             print('error getting banner', e)
             self.banner = "timeout error - unable to get banner"
         try:
+            # b.send("blockchain.scripthash.get_history", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
+            # b'{"jsonrpc":"2.0","result":[{"tx_hash":"a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3","height":2292586}],"id":1656046324946}\n'
             self.transactionHistory = ElectrumXAPI.interpret(self.conn.send(
                 'blockchain.scripthash.get_history',
                 self.scripthash))
         except Exception as e:
             print('error getting transaction history', e)
             self.transactionHistory = []
-        # b.send("blockchain.scripthash.get_history", script_hash('REsQeZT8KD8mFfcD4ZQQWis4Ju9eYjgxtT'))
-        # b'{"jsonrpc":"2.0","result":[{"tx_hash":"a015f44b866565c832022cab0dec94ce0b8e568dbe7c88dce179f9616f7db7e3","height":2292586}],"id":1656046324946}\n'
         self.unspentCurrency = ElectrumXAPI.interpret(self.conn.send(
             'blockchain.scripthash.listunspent',
             self.scripthash))
-        self.unspentAssets = ElectrumXAPI.interpret(self.conn.send(
-            'blockchain.scripthash.listassets',
-            self.scripthash))
+        if self.chain == 'Evrmore':
+            # {'jsonrpc': '2.0', 'result': {'confirmed': 0, 'unconfirmed': 0}, 'id': 1719672672565}
+            self.balances = ElectrumXAPI.interpret(self.conn.send(
+                'blockchain.scripthash.get_balance',
+                self.scripthash,
+                'SATORI'))
+            self.balance = self.balances.get(
+                'confirmed', 0) + self.balances.get('unconfirmed', 0)
+            # {'jsonrpc': '2.0', 'result': [{'tx_hash': 'bea0e23c0aa8a4f1e1bb8cda0c6f487a3c0c0e7a54c47b6e1883036898bdc101', 'tx_pos': 0, 'height': 868584, 'asset': 'KINKAJOU/GROOMER1', 'value': 100000000}], 'id': 1719672839478}
+            self.unspentAssets = ElectrumXAPI.interpret(self.conn.send(
+                'blockchain.scripthash.listunspent',
+                self.scripthash,
+                'SATORI'))
+        else:
+            self.balance = ElectrumXAPI.interpret(self.conn.send(
+                'blockchain.scripthash.get_asset_balance',
+                self.scripthash)
+            ).get('confirmed', {}).get('SATORI', 0)
+            self.unspentAssets = ElectrumXAPI.interpret(self.conn.send(
+                'blockchain.scripthash.listassets',
+                self.scripthash))
+
         # we don't actually need this, we can regenerate the asset script.
         # self.assetTransactions = []
         # for unspentAssetHash in [
@@ -199,7 +214,7 @@ class ElectrumXAPI():
             'blockchain.scripthash.get_asset_balance',
             scripthash)).get('confirmed', {}).get('SATORI', 0)
 
-    def getAssetHolders(self) -> Union[dict[str, int], bool]:
+    def getAssetHolders(self, targetAddress: Union[str, None] = None) -> Union[dict[str, int], bool]:
         '''
         gives back a full list of wallets and their amounts of a particular asset. 
         loops until it gets the full list.
@@ -215,9 +230,11 @@ class ElectrumXAPI():
             x = ElectrumXAPI.interpret(self.conn.send(
                 'blockchain.asset.list_addresses_by_asset',
                 'SATORI', False, 1000, i))
-            addresses = {
-                **addresses,
-                **x}
+            if targetAddress is not None and targetAddress in x.keys():
+                return {targetAddress: x[targetAddress]}
+            addresses = {**addresses, **x}
+            if len(x) < 1000:
+                break
             i = i + 1000
             time.sleep(1)  # incase there's a huge number we throttle
         return addresses
