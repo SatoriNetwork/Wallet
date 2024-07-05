@@ -206,6 +206,14 @@ class ElectrumXAPI():
                 # b'{"jsonrpc":"2.0","result":"0200000001aece4f378e364682d77ea345581f4880edd0709c2bf524320b223e7c66aaf25b000000006a473044022079b86eae8bf1974be0134387f6db11a49f273660ec2ea0ce98bb5cf31dfb70d702200b1d46a748f2dea4753175f9f695a16dfdbdbdb50400076cd28165795a80b30a012103571524d47ad9240a9674c2085959c60ea62c5d5567b62e0bfd4d40727bba7a8affffffff0400743ba40b0000001976a914f62e63b933953a680f3c3a63324948293ba47d1688ac52b574088c1000001976a9143d5143a9336eaf44990a0b4249fcb823d70de52c88ac00000000000000002876a9143d5143a9336eaf44990a0b4249fcb823d70de52c88acc00c72766e6f075341544f5249217500000000000000003276a9143d5143a9336eaf44990a0b4249fcb823d70de52c88acc01672766e71065341544f524900407a10f35a00000001007500000000","id":1656046440320}\n'
                 # print(bytes.fromhex('68656c6c6f').decode('utf-8'))
 
+    def getTransaction(self, txHash: str, throttle: int = .34):
+        ''' using a throttle here because this is often used to get lists in a dataframe apply method'''
+        import time
+        time.sleep(throttle)
+        return ElectrumXAPI.interpret(self.conn.send(
+            'blockchain.transaction.get',
+            txHash, True))
+
     def getAssetForHolder(self, scripthash: str, throttle: int = 1):
         ''' using a throttle here because this is often used to get lists in a dataframe apply method'''
         import time
