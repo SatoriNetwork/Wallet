@@ -21,6 +21,8 @@ class ElectrumXAPI():
         self.transactions = None
         self.servers = servers
         self.lastHandshake = None
+        # if we fail to connect to a server, remember it so we avoid it.
+        self.failedServers = []
 
     def connected(self):
         return self.conn is not None and self.conn.connected()
@@ -28,6 +30,24 @@ class ElectrumXAPI():
     def connect(self):
         if len(self.servers) == 0:
             return
+        tries = 0
+        while tries <= len(self.servers):
+            tries += 1
+            hostPort = random.choice(self.servers)
+            if hostPort in self.failedServers:
+                continue
+            try:
+                return ElectrumX(
+                    host=hostPort.split(':')[0],
+                    port=int(hostPort.split(':')[1]),
+                    ssl=True,
+                    timeout=5)
+            except socket.timeout:
+                self.failedServers.append(hostPort)
+                continue
+            except Exception as _:
+                self.failedServers.append(hostPort)
+                continue
         hostPort = random.choice(self.servers)
         return ElectrumX(
             host=hostPort.split(':')[0],
