@@ -4,6 +4,7 @@ import json
 import time
 from .connector import Connector
 
+
 class ElectrumX(Connector):
     def __init__(self, *args, **kwargs):
         self.log = logging.getLogger(type(self).__name__)
@@ -13,7 +14,7 @@ class ElectrumX(Connector):
         buffer = ''
         while True:
             try:
-                logging.info("Receiving the data", color="green")
+                self.log.info("Receiving the data")
                 raw = self.connection.recv(1024*16).decode('utf-8')
                 buffer += raw
                 if '\n' in raw:
@@ -53,20 +54,20 @@ class ElectrumX(Connector):
         self.log.log(5, "send {} {}".format(method, args))
         self.connection.send(payload)
         return self._receive()
-    
+
     def receive_notifications(self):
         """
         Continuously listens for notifications from the server.
         """
-        logging.info("receive_notifications started")
+        self.log.info("receive_notifications started")
         while True:
             try:
                 update = self._receive()
-                logging.info("Got Updates", update)
+                self.log.info(f"Got Updates {update}")
                 if update and 'method' in update and update['method'] == 'blockchain.scripthash.subscribe':
                     yield update
                 elif update is None:
-                    logging.info("Received None update, breaking loop")
+                    self.log.info("Received None update, breaking loop")
                     break  # Handle the case where the connection might have dropped
             except Exception as e:
                 logging.error(f"Error in receive_notifications: {str(e)}")

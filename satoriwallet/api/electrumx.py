@@ -2,11 +2,11 @@ from typing import Union, List, Dict
 import socket
 import json
 import random
+import logging
 import time
 from threading import Thread, Event
 from satoriwallet.api.blockchain import ElectrumX
 from satoriwallet.lib.structs import TransactionStruct
-from satorineuron import logging
 
 class ElectrumXAPI:
     def __init__(self, address: str, scripthash: str, servers: list[str], chain: str, timeout: int = 5, retry_attempts: int = 3):
@@ -44,7 +44,7 @@ class ElectrumXAPI:
     def __del__(self):
         # Ensure listener is stopped when the object is deleted
         self.stopSubscription()
-        
+
     @staticmethod
     def interpret(decoded: dict):
         # print(x.decode('utf-8'))
@@ -57,10 +57,10 @@ class ElectrumXAPI:
             return decoded.get('error')
         else:
             return decoded
-        
+
     def connected(self):
         return self.conn is not None and self.conn.connected()
-    
+
     # New Methods with Refactoring
     # Connect method to connect ElectrumX server
     def connect(self):
@@ -92,7 +92,7 @@ class ElectrumXAPI:
     # Ensure if the connection is established or not
     # Private Method
     def _ensureConnected(self):
-        logging.info("Ensure Connection", self.conn, color='red')
+        logging.info(f"Ensure Connection {self.conn}")
         if not self.conn:
             self.connect()
         elif not self.conn.connected():
@@ -100,7 +100,7 @@ class ElectrumXAPI:
 
     # Handshake method to create the handshake with the ElectrumX server
     def handshake(self) -> bool:
-        logging.info("handshake Connection", self.conn, color='red')
+        logging.info(f"handshake Connection {self.conn}")
         self._ensureConnected()
         if self.last_handshake and time.time() - self.last_handshake < 60 * 60:
             return True
@@ -145,7 +145,7 @@ class ElectrumXAPI:
             result = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash)
             self._currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
         return self._currency
-    
+
     # banner Element
     @property
     def bannerEle(self):
@@ -167,7 +167,7 @@ class ElectrumXAPI:
                 logging.error(f"Error getting transaction history: {str(e)}")
                 self._transaction_history = []
         return self._transaction_history
-    
+
     # unSpentCurrency Element method to get the unSpent currency data
     @property
     def unSpentCurrencyEle(self):
@@ -197,7 +197,7 @@ class ElectrumXAPI:
                 self.balances = self._sendRequest('blockchain.scripthash.get_asset_balance', False, self.scripthash)
                 self._balance = self.balances.get('confirmed', {}).get('SATORI', 0)
         return self._balance
-    
+
     # getTransaction Method to get the transaction
     def getTransaction(self, tx_hash: str, throttle: int = 0.34):
         time.sleep(throttle)
@@ -207,7 +207,7 @@ class ElectrumXAPI:
     def getAssetBalanceForHolder(self, scripthash: str, throttle: int = 1):
         time.sleep(throttle)
         return self._sendRequest('blockchain.scripthash.get_asset_balance', True, scripthash).get('confirmed', {}).get('SATORI', 0)
-    
+
     # getAssetHolders
     def getAssetHolders(self, target_address: Union[str, None] = None) -> Union[Dict[str, int], bool]:
         if not self.handshake():
@@ -233,7 +233,7 @@ class ElectrumXAPI:
         if self.handshake():
             self.sentTx = self._sendRequest('blockchain.transaction.broadcast', True, raw_tx)
         return self.sentTx
-    
+
     # get method to get the data
     def get(self, allWalletInfo=False):
         """
@@ -261,7 +261,7 @@ class ElectrumXAPI:
             self.assetVouts = [
                 self.getTransaction(tx.get('tx_hash')) for tx in self.unspentAssets
             ]
-            
+
             self.transactions = []
             for tx in self.transactionHistory:
                 raw = self.getTransaction(tx.get('tx_hash', ''))
@@ -274,18 +274,18 @@ class ElectrumXAPI:
         Subscribe to the scripthash and start listening for updates.
         """
         # Ensure the connection is established and handshake is performed
-        logging.info("subscribeScriptHash started", color="yellow")
+        logging.info("subscribeScriptHash started")
         if not self.handshake():
             return Exception("Not connected to ElectrumX server.")
 
         # Subscribe to the scripthash
         initial_status = self._sendRequest('blockchain.scripthash.subscribe', False, self.scripthash)
-        logging.info(f"Initial status for scripthash {self.scripthash}: {initial_status}", color="yellow")
+        logging.info(f"Initial status for scripthash {self.scripthash}: {initial_status}")
 
         # Subscribe to the headers for new block
         initial_status_header = self._sendRequest('blockchain.headers.subscribe', False)
-        logging.info(f"Initial status for header: {initial_status_header}", color="yellow")
-        
+        logging.info(f"Initial status for header: {initial_status_header}")
+
         # Start a thread to listen for updates
         self.subscription_thread = Thread(target=self._processNotifications)
         self.subscription_thread.start()
@@ -295,32 +295,32 @@ class ElectrumXAPI:
         """
         Processes incoming notifications for the subscribed scripthash.
         """
-        logging.info("_processNotifications started", color="yellow")
+        logging.info("_processNotifications started")
 
         try:
             for notification in self.conn.receive_notifications():
-                logging.info("Received notification", notification, color="green")
+                logging.info(f"Received notification {notification}")
                 if self.stop_event.is_set():
-                    logging.info("Stop event set, breaking loop", color="yellow")
+                    logging.info("Stop event set, breaking loop")
                     break
                 if 'params' in notification and len(notification['params']) == 2:
                     scripthash, status = notification['params']
                     if scripthash == self.scripthash:
                         logging.info(f"Received update for scripthash {scripthash}: {status}")
         except Exception as e:
-            logging.error(f"Error in _processNotifications: {str(e)}", color="red")
-        
-        logging.info("_processNotifications ended", color="yellow")
-                
-    # Method to stop subscription 
+            logging.error(f"Error in _processNotifications: {str(e)}")
+
+        logging.info("_processNotifications ended")
+
+    # Method to stop subscription
     # unsubscribe from the ElectrumX server
     # Stop the event and thread
     def stopSubscription(self):
         """
         Stops the subscription thread.
         """
-        logging.info("Stop subscription started", self.subscription_thread, color="red")
-        logging.info("Stop subscription", self.subscription_thread.is_alive(), color="red")
+        logging.info(f"Stop subscription started {self.subscription_thread}")
+        logging.info(f"Stop subscription {self.subscription_thread.is_alive()}")
 
         # Unsubscribe from the scripthash
         try:
@@ -433,7 +433,7 @@ class ElectrumXAPI:
         #
         # def splitBalanceOnDivisibility():
         #    return self.balance / int('1' + ('0'*invertDivisibility(int(self.stats.get('divisions', 8)))) )
-        logging.info("Getting connection value", self.conn, color='red')
+        logging.info(f"Getting connection value {self.conn}")
         if not self.handshake():
             return False
         currency = ElectrumXAPI.interpret(self.conn.send(
@@ -549,7 +549,7 @@ class ElectrumXAPI:
 
     def getAssetHoldersOld(self, targetAddress: Union[str, None] = None) -> Union[dict[str, int], bool]:
         '''
-        gives back a full list of wallets and their amounts of a particular asset. 
+        gives back a full list of wallets and their amounts of a particular asset.
         loops until it gets the full list.
         '''
         import time

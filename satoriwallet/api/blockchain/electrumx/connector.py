@@ -1,7 +1,7 @@
 import socket
 import ssl
 import select
-from satorineuron import logging
+import logging
 
 class Connector:
     def __init__(self, host, port, ssl=False, timeout=5, network='mainnet'):
