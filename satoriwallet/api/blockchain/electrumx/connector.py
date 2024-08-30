@@ -1,8 +1,7 @@
 import socket
 import ssl
-import logging
 import select
-
+from satorineuron import logging
 
 class Connector:
     def __init__(self, host, port, ssl=False, timeout=5, network='mainnet'):
@@ -40,10 +39,9 @@ class Connector:
             return False
 
     def _connect(self):
-
         # self.log.log(10, "_connect {} {}".format(self.host, self.port))
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connection.settimeout(self.timeout)
+        # self.connection.settimeout(self.timeout)
         if self.ssl:
             # Create a SSL context with a specific protocol
             # context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)

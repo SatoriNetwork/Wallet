@@ -19,6 +19,8 @@ class ElectrumXAPI:
         self.conn = None
         self.last_handshake = None
         self.transactions = None
+        self.subscription_thread = None
+        self.stop_event = Event()
 
         # Cached results ( Private Values )
         self._balance = None
@@ -39,6 +41,10 @@ class ElectrumXAPI:
         self.failedServers = []
         # if we fail to connect to a server, remember it so we avoid it.
 
+    def __del__(self):
+        # Ensure listener is stopped when the object is deleted
+        self.stopSubscription()
+        
     @staticmethod
     def interpret(decoded: dict):
         # print(x.decode('utf-8'))
@@ -261,6 +267,79 @@ class ElectrumXAPI:
                 raw = self.getTransaction(tx.get('tx_hash', ''))
                 txs = [self.getTransaction(vin.get('txid', '')) for vin in raw.get('vin', [])]
                 self.transactions.append(TransactionStruct(raw=raw, vinVoutsTxs=txs))
+
+    # New method for subscribing to a scripthash and listening for updates
+    def subscribeScriptHash(self):
+        """
+        Subscribe to the scripthash and start listening for updates.
+        """
+        # Ensure the connection is established and handshake is performed
+        logging.info("subscribeScriptHash started", color="yellow")
+        if not self.handshake():
+            return Exception("Not connected to ElectrumX server.")
+
+        # Subscribe to the scripthash
+        initial_status = self._sendRequest('blockchain.scripthash.subscribe', False, self.scripthash)
+        logging.info(f"Initial status for scripthash {self.scripthash}: {initial_status}", color="yellow")
+
+        # Subscribe to the headers for new block
+        initial_status_header = self._sendRequest('blockchain.headers.subscribe', False)
+        logging.info(f"Initial status for header: {initial_status_header}", color="yellow")
+        
+        # Start a thread to listen for updates
+        self.subscription_thread = Thread(target=self._processNotifications)
+        self.subscription_thread.start()
+
+    # _processNotifications method to listening for updates
+    def _processNotifications(self):
+        """
+        Processes incoming notifications for the subscribed scripthash.
+        """
+        logging.info("_processNotifications started", color="yellow")
+
+        try:
+            for notification in self.conn.receive_notifications():
+                logging.info("Received notification", notification, color="green")
+                if self.stop_event.is_set():
+                    logging.info("Stop event set, breaking loop", color="yellow")
+                    break
+                if 'params' in notification and len(notification['params']) == 2:
+                    scripthash, status = notification['params']
+                    if scripthash == self.scripthash:
+                        logging.info(f"Received update for scripthash {scripthash}: {status}")
+        except Exception as e:
+            logging.error(f"Error in _processNotifications: {str(e)}", color="red")
+        
+        logging.info("_processNotifications ended", color="yellow")
+                
+    # Method to stop subscription 
+    # unsubscribe from the ElectrumX server
+    # Stop the event and thread
+    def stopSubscription(self):
+        """
+        Stops the subscription thread.
+        """
+        logging.info("Stop subscription started", self.subscription_thread, color="red")
+        logging.info("Stop subscription", self.subscription_thread.is_alive(), color="red")
+
+        # Unsubscribe from the scripthash
+        try:
+            self._sendRequest('blockchain.scripthash.unsubscribe', True, self.scripthash)
+            logging.info(f"Unsubscribed from scripthash {self.scripthash}", color="green")
+        except Exception as e:
+            logging.error(f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
+
+        # Unsubscribe from the header subscription
+        try:
+            self._sendRequest('blockchain.headers.unsubscribe', True)
+            logging.info(f"Unsubscribed from headers", color="green")
+        except Exception as e:
+            logging.error(f"Error while unsubscribing from headers: {str(e)}")
+
+        if self.subscription_thread and self.subscription_thread.is_alive():
+            self.stop_event.set()
+            self.subscription_thread.join()
+            logging.info(f"Stopped subscription thread for scripthash {self.scripthash}")
 
     # Old Methods
     # Currently we are not using this, Once we tested the new methods and if they work fine then we will delete all these methods
