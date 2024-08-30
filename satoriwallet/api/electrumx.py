@@ -1,9 +1,11 @@
 from typing import Union, List, Dict
+from collections import deque
 import socket
 import json
 import random
 import logging
 import time
+import os
 from threading import Thread, Event
 from satoriwallet.api.blockchain import ElectrumX
 from satoriwallet.lib.structs import TransactionStruct
@@ -40,6 +42,14 @@ class ElectrumXAPI:
         self.transactionHistory = None
         self.failedServers = []
         # if we fail to connect to a server, remember it so we avoid it.
+
+        self.block_headers = deque(maxlen=1000)  # Store last 1000 block headers
+        self.last_saved_height = 0
+        self.headers_dir = os.path.join("/Satori/Wallet/satoriwallet/api/", 'headers')
+        os.makedirs(self.headers_dir, exist_ok=True)
+        # Use a relative path for the headers file
+        self.headers_file = os.path.join(self.headers_dir, f"headers_{chain}.json")
+        self._load_headers_from_disk()
 
     def __del__(self):
         # Ensure listener is stopped when the object is deleted
@@ -86,13 +96,13 @@ class ElectrumXAPI:
                 self.failed_servers.add(hostPort)
             except Exception as e:
                 self.failed_servers.add(hostPort)
-                logging.error(f"Connection error to {hostPort}: {str(e)}")
+                print(f"Connection error to {hostPort}: {str(e)}")
         raise Exception("Unable to connect to any ElectrumX server")
 
     # Ensure if the connection is established or not
     # Private Method
     def _ensureConnected(self):
-        logging.info(f"Ensure Connection {self.conn}")
+        print(f"Ensure Connection {self.conn}")
         if not self.conn:
             self.connect()
         elif not self.conn.connected():
@@ -100,7 +110,7 @@ class ElectrumXAPI:
 
     # Handshake method to create the handshake with the ElectrumX server
     def handshake(self) -> bool:
-        logging.info(f"handshake Connection {self.conn}")
+        print(f"handshake Connection {self.conn}")
         self._ensureConnected()
         if self.last_handshake and time.time() - self.last_handshake < 60 * 60:
             return True
@@ -116,7 +126,7 @@ class ElectrumXAPI:
             except Exception:
                 self.conn = None  # Force reconnect on the next try
 
-        logging.error("Handshake failed after multiple attempts")
+        print("Handshake failed after multiple attempts")
         return False
 
     # _sendRequest function to send the data through socket to ElectrumX server
@@ -132,10 +142,10 @@ class ElectrumXAPI:
             response = self.conn.send(method, *params)
             return ElectrumXAPI.interpret(response)
         except socket.timeout as e:
-            logging.error(f"Timeout during {method}: {str(e)}")
+            print(f"Timeout during {method}: {str(e)}")
             raise
         except Exception as e:
-            logging.error(f"Error during {method}: {str(e)}")
+            print(f"Error during {method}: {str(e)}")
             raise
 
     # currency Element
@@ -153,7 +163,7 @@ class ElectrumXAPI:
             try:
                 self._banner = self._sendRequest('server.banner', False)
             except Exception as e:
-                logging.error(f"Error getting banner: {str(e)}")
+                print(f"Error getting banner: {str(e)}")
                 self._banner = "timeout error - unable to get banner"
         return self._banner
 
@@ -164,7 +174,7 @@ class ElectrumXAPI:
             try:
                 self._transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, self.scripthash)
             except Exception as e:
-                logging.error(f"Error getting transaction history: {str(e)}")
+                print(f"Error getting transaction history: {str(e)}")
                 self._transaction_history = []
         return self._transaction_history
 
@@ -274,17 +284,17 @@ class ElectrumXAPI:
         Subscribe to the scripthash and start listening for updates.
         """
         # Ensure the connection is established and handshake is performed
-        logging.info("subscribeScriptHash started")
+        print("subscribeScriptHash started")
         if not self.handshake():
             return Exception("Not connected to ElectrumX server.")
 
         # Subscribe to the scripthash
         initial_status = self._sendRequest('blockchain.scripthash.subscribe', False, self.scripthash)
-        logging.info(f"Initial status for scripthash {self.scripthash}: {initial_status}")
+        print(f"Initial status for scripthash {self.scripthash}: {initial_status}")
 
         # Subscribe to the headers for new block
         initial_status_header = self._sendRequest('blockchain.headers.subscribe', False)
-        logging.info(f"Initial status for header: {initial_status_header}")
+        print(f"Initial status for header: {initial_status_header}")
 
         # Start a thread to listen for updates
         self.subscription_thread = Thread(target=self._processNotifications)
@@ -293,25 +303,128 @@ class ElectrumXAPI:
     # _processNotifications method to listening for updates
     def _processNotifications(self):
         """
-        Processes incoming notifications for the subscribed scripthash.
+        Processes incoming notifications for the subscribed scripthash and headers.
         """
-        logging.info("_processNotifications started")
+        print("_processNotifications started")
 
         try:
             for notification in self.conn.receive_notifications():
-                logging.info(f"Received notification {notification}")
+                print(f"Received notification {notification}")
                 if self.stop_event.is_set():
-                    logging.info("Stop event set, breaking loop")
+                    print("Stop event set, breaking loop")
                     break
-                if 'params' in notification and len(notification['params']) == 2:
-                    scripthash, status = notification['params']
-                    if scripthash == self.scripthash:
-                        logging.info(f"Received update for scripthash {scripthash}: {status}")
+                
+                if 'method' in notification:
+                    if notification['method'] == 'blockchain.scripthash.subscribe':
+                        if 'params' in notification and len(notification['params']) == 2:
+                            scripthash, status = notification['params']
+                            if scripthash == self.scripthash:
+                                print(f"Received update for scripthash {scripthash}: {status}")
+                                # Here you can add logic to handle the scripthash update
+                    elif notification['method'] == 'blockchain.headers.subscribe':
+                        if 'params' in notification and len(notification['params']) > 0:
+                            header = notification['params'][0]
+                            print(f"Received new block header: height {header.get('height')}, hash {header.get('hex')[:64]}")
+                            self._store_block_header(header)
+                    else:
+                        print(f"Received unknown method: {notification['method']}")
         except Exception as e:
-            logging.error(f"Error in _processNotifications: {str(e)}")
+            print(f"Error in _processNotifications: {str(e)}")
 
-        logging.info("_processNotifications ended")
+        print("_processNotifications ended")
 
+    def _store_block_header(self, header):
+        """
+        Stores a new block header and periodically saves to disk.
+        """
+        print(f"receive_notifications started {len(self.block_headers)}")
+        self.block_headers.append(header)
+        
+        # Save to disk every 100 new headers
+        if header['height'] % 3 == 0:
+            self._save_headers_to_disk()
+
+    def _save_headers_to_disk(self):
+        """
+        Saves all known block headers to disk.
+        """
+        print("_save_headers_to_disk called")
+        all_headers = list(self.block_headers)
+        
+        # If we have previously saved headers, load them first
+        if os.path.exists(self.headers_file):
+            with open(self.headers_file, 'r') as f:
+                existing_headers = json.load(f)
+            
+            # Merge existing headers with new ones, removing duplicates
+            all_headers = self._merge_headers(existing_headers, all_headers)
+        
+        with open(self.headers_file, 'w') as f:
+            json.dump(all_headers, f)
+        
+        self.last_saved_height = all_headers[-1]['height']
+        print(f"Saved {len(all_headers)} headers to disk. Last height: {self.last_saved_height}")
+
+    def _merge_headers(self, existing_headers, new_headers):
+        """
+        Merges existing headers with new headers, removing duplicates.
+        """
+        existing_dict = {h['height']: h for h in existing_headers}
+        new_dict = {h['height']: h for h in new_headers}
+        existing_dict.update(new_dict)
+        return sorted(existing_dict.values(), key=lambda h: h['height'])
+
+    def _load_headers_from_disk(self):
+        """
+        Loads block headers from disk if available.
+        """
+        if os.path.exists(self.headers_file):
+            with open(self.headers_file, 'r') as f:
+                all_headers = json.load(f)
+            
+            # Load the most recent 1000 headers into memory
+            self.block_headers = deque(all_headers[-1000:], maxlen=1000)
+            self.last_saved_height = all_headers[-1]['height']
+            print(f"Loaded {len(all_headers)} headers from disk. Last height: {self.last_saved_height}")
+            print(f"Keeping last {len(self.block_headers)} headers in memory.")
+
+    def get_block_headers(self, start_height=None, end_height=None):
+        """
+        Retrieves block headers within the specified height range.
+        If the requested headers are not in memory, it loads them from disk.
+        """
+        if start_height is None:
+            start_height = self.last_saved_height - len(self.block_headers) + 1
+        if end_height is None:
+            end_height = self.last_saved_height
+
+        # Check if we need to load headers from disk
+        if start_height < self.block_headers[0]['height'] or end_height > self.block_headers[-1]['height']:
+            return self._load_specific_headers_from_disk(start_height, end_height)
+
+        return [header for header in self.block_headers if start_height <= header['height'] <= end_height]
+
+    def _load_specific_headers_from_disk(self, start_height, end_height):
+        """
+        Loads specific block headers from disk based on the given height range.
+        """
+        if not os.path.exists(self.headers_file):
+            return []
+
+        with open(self.headers_file, 'r') as f:
+            all_headers = json.load(f)
+
+        # Filter headers based on the requested range
+        filtered_headers = [h for h in all_headers if start_height <= h['height'] <= end_height]
+
+        # Update in-memory headers if we've loaded more recent ones
+        if filtered_headers and filtered_headers[-1]['height'] > self.block_headers[-1]['height']:
+            self.block_headers = deque(all_headers[-1000:], maxlen=1000)
+            self.last_saved_height = self.block_headers[-1]['height']
+            print(f"Updated in-memory headers. Last height: {self.last_saved_height}")
+
+        return filtered_headers
+    
     # Method to stop subscription
     # unsubscribe from the ElectrumX server
     # Stop the event and thread
@@ -319,27 +432,27 @@ class ElectrumXAPI:
         """
         Stops the subscription thread.
         """
-        logging.info(f"Stop subscription started {self.subscription_thread}")
-        logging.info(f"Stop subscription {self.subscription_thread.is_alive()}")
+        print(f"Stop subscription started {self.subscription_thread}")
+        print(f"Stop subscription {self.subscription_thread.is_alive()}")
 
         # Unsubscribe from the scripthash
         try:
             self._sendRequest('blockchain.scripthash.unsubscribe', True, self.scripthash)
-            logging.info(f"Unsubscribed from scripthash {self.scripthash}", color="green")
+            print(f"Unsubscribed from scripthash {self.scripthash}", color="green")
         except Exception as e:
-            logging.error(f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
+            print(f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
 
         # Unsubscribe from the header subscription
         try:
             self._sendRequest('blockchain.headers.unsubscribe', True)
-            logging.info(f"Unsubscribed from headers", color="green")
+            print(f"Unsubscribed from headers", color="green")
         except Exception as e:
-            logging.error(f"Error while unsubscribing from headers: {str(e)}")
+            print(f"Error while unsubscribing from headers: {str(e)}")
 
         if self.subscription_thread and self.subscription_thread.is_alive():
             self.stop_event.set()
             self.subscription_thread.join()
-            logging.info(f"Stopped subscription thread for scripthash {self.scripthash}")
+            print(f"Stopped subscription thread for scripthash {self.scripthash}")
 
     # Old Methods
     # Currently we are not using this, Once we tested the new methods and if they work fine then we will delete all these methods
@@ -372,7 +485,7 @@ class ElectrumXAPI:
             timeout=5)
 
     def handshakeOld(self) -> bool:
-        logging.info("Handshake initial", self.connected() and self.lastHandshake != None and time.time() - self.lastHandshake < 60*60, color='red')
+        print("Handshake initial", self.connected() and self.lastHandshake != None and time.time() - self.lastHandshake < 60*60, color='red')
         if self.connected() and self.lastHandshake != None and time.time() - self.lastHandshake < 60*60:
             # not sure if this will always work well. what if our handshake is
             # no longer valid? or we get disconnected somehow but don't know it?
@@ -433,7 +546,7 @@ class ElectrumXAPI:
         #
         # def splitBalanceOnDivisibility():
         #    return self.balance / int('1' + ('0'*invertDivisibility(int(self.stats.get('divisions', 8)))) )
-        logging.info(f"Getting connection value {self.conn}")
+        print(f"Getting connection value {self.conn}")
         if not self.handshake():
             return False
         currency = ElectrumXAPI.interpret(self.conn.send(
