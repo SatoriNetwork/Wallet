@@ -278,6 +278,55 @@ class ElectrumXAPI:
                 txs = [self.getTransaction(vin.get('txid', '')) for vin in raw.get('vin', [])]
                 self.transactions.append(TransactionStruct(raw=raw, vinVoutsTxs=txs))
 
+    def _fetch_and_update_currency(self):
+        result = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash)
+        self._currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
+        self.currency = self._currency
+
+    def _fetch_and_update_banner(self):
+        try:
+            self._banner = self._sendRequest('server.banner', False)
+        except Exception as e:
+            print(f"Error getting banner: {str(e)}")
+            self._banner = "timeout error - unable to get banner"
+        self.banner = self._banner
+
+    def _fetch_and_update_transaction_history(self):
+        try:
+            self._transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, self.scripthash)
+        except Exception as e:
+            print(f"Error getting transaction history: {str(e)}")
+            self._transaction_history = []
+        self.transactionHistory = self._transaction_history
+
+    def _fetch_and_update_unspent_currency(self):
+        self._unspent_currency = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash)
+        self.unspentCurrency = self._unspent_currency
+
+    def _fetch_and_update_balance(self):
+        if self.chain == 'Evrmore':
+            self.balances = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash, 'SATORI')
+            self._balance = self.balances.get('confirmed', 0) + self.balances.get('unconfirmed', 0)
+        else:
+            self.balances = self._sendRequest('blockchain.scripthash.get_asset_balance', False, self.scripthash)
+            self._balance = self.balances.get('confirmed', {}).get('SATORI', 0)
+        self.balance = self._balance
+
+    def _fetch_and_update_unspent_assets(self):
+        if self.chain == 'Evrmore':
+            self._unspent_assets = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash, 'SATORI')
+        else:
+            self._unspent_assets = self._sendRequest('blockchain.scripthash.listassets', False, self.scripthash)
+        self.unspentAssets = self._unspent_assets
+
+    def _fetch_and_update_all(self):
+        self._fetch_and_update_currency()
+        self._fetch_and_update_banner()
+        self._fetch_and_update_transaction_history()
+        self._fetch_and_update_unspent_currency()
+        self._fetch_and_update_balance()
+        self._fetch_and_update_unspent_assets()
+
     # New method for subscribing to a scripthash and listening for updates
     def subscribeScriptHash(self):
         """
@@ -320,7 +369,7 @@ class ElectrumXAPI:
                             scripthash, status = notification['params']
                             if scripthash == self.scripthash:
                                 print(f"Received update for scripthash {scripthash}: {status}")
-                                # Here you can add logic to handle the scripthash update
+                                self._fetch_and_update_all()
                     elif notification['method'] == 'blockchain.headers.subscribe':
                         if 'params' in notification and len(notification['params']) > 0:
                             header = notification['params'][0]
@@ -341,7 +390,7 @@ class ElectrumXAPI:
         self.block_headers.append(header)
         
         # Save to disk every 100 new headers
-        if header['height'] % 3 == 0:
+        if header['height'] % 100 == 0:
             self._save_headers_to_disk()
 
     def _save_headers_to_disk(self):

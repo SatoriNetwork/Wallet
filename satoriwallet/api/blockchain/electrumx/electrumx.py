@@ -14,7 +14,6 @@ class ElectrumX(Connector):
         buffer = ''
         while True:
             try:
-                print("Receiving the data")
                 raw = self.connection.recv(1024*16).decode('utf-8')
                 buffer += raw
                 if '\n' in raw:
