@@ -94,11 +94,13 @@ class ElectrumXAPI():
         return False
 
     @staticmethod
-    def interpret(decoded: dict):
+    def interpret(decoded: dict) -> Union[dict, None]:
         # print(x.decode('utf-8'))
         # decoded = json.loads(x.decode('utf-8'))
         if decoded is None:
             return None
+        if isinstance(decoded, str):
+            return {'result': decoded}
         if 'result' in decoded.keys():
             return decoded.get('result')
         if 'error' in decoded.keys():
@@ -244,7 +246,7 @@ class ElectrumXAPI():
 
     def getAssetHolders(self, targetAddress: Union[str, None] = None) -> Union[dict[str, int], bool]:
         '''
-        gives back a full list of wallets and their amounts of a particular asset. 
+        gives back a full list of wallets and their amounts of a particular asset.
         loops until it gets the full list.
         '''
         import time
