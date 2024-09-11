@@ -55,19 +55,6 @@ class ElectrumXAPI:
         # Ensure listener is stopped when the object is deleted
         self.stopSubscription()
 
-    @staticmethod
-    def interpret(decoded: dict):
-        # print(x.decode('utf-8'))
-        # decoded = json.loads(x.decode('utf-8'))
-        if decoded is None:
-            return None
-        if 'result' in decoded.keys():
-            return decoded.get('result')
-        if 'error' in decoded.keys():
-            return decoded.get('error')
-        else:
-            return decoded
-
     def connected(self):
         return self.conn is not None and self.conn.connected()
 
