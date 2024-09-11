@@ -572,6 +572,21 @@ class ElectrumXAPI:
             return True
         return False
 
+    @staticmethod
+    def interpret(decoded: dict) -> Union[dict, None]:
+        # print(x.decode('utf-8'))
+        # decoded = json.loads(x.decode('utf-8'))
+        if decoded is None:
+            return None
+        if isinstance(decoded, str):
+            return {'result': decoded}
+        if 'result' in decoded.keys():
+            return decoded.get('result')
+        if 'error' in decoded.keys():
+            return decoded.get('error')
+        else:
+            return decoded
+        
     def getOld(self, allWalletInfo=False):
         '''
         this needs to be moved out into an interface with the blockchain,
