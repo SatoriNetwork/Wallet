@@ -74,6 +74,7 @@ class ElectrumXAPI:
     # New Methods with Refactoring
     # Connect method to connect ElectrumX server
     def connect(self):
+        print(f"!!!!!!!!!!!!!!!Trying to build the connection!!!!!!!!!! {self.conn}")
         if len(self.servers) == 0:
             raise Exception("No servers available")
         if self.conn is not None:
@@ -482,23 +483,22 @@ class ElectrumXAPI:
         Stops the subscription thread.
         """
         print(f"Stop subscription started {self.subscription_thread}")
-        print(f"Stop subscription {self.subscription_thread.is_alive()}")
-
-        # Unsubscribe from the scripthash
-        try:
-            self._sendRequest('blockchain.scripthash.unsubscribe', True, self.scripthash)
-            print(f"Unsubscribed from scripthash {self.scripthash}", color="green")
-        except Exception as e:
-            print(f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
-
-        # Unsubscribe from the header subscription
-        try:
-            self._sendRequest('blockchain.headers.unsubscribe', True)
-            print(f"Unsubscribed from headers", color="green")
-        except Exception as e:
-            print(f"Error while unsubscribing from headers: {str(e)}")
 
         if self.subscription_thread and self.subscription_thread.is_alive():
+            # Unsubscribe from the scripthash
+            try:
+                self._sendRequest('blockchain.scripthash.unsubscribe', True, self.scripthash)
+                print(f"Unsubscribed from scripthash {self.scripthash}", color="green")
+            except Exception as e:
+                print(f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
+
+            # Unsubscribe from the header subscription
+            try:
+                self._sendRequest('blockchain.headers.unsubscribe', True)
+                print(f"Unsubscribed from headers", color="green")
+            except Exception as e:
+                print(f"Error while unsubscribing from headers: {str(e)}")
+
             self.stop_event.set()
             self.subscription_thread.join()
             print(f"Stopped subscription thread for scripthash {self.scripthash}")
