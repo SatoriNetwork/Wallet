@@ -11,28 +11,47 @@ from satoriwallet.api.blockchain import ElectrumX
 from satoriwallet.lib.structs import TransactionStruct
 
 class ElectrumXAPI:
-    def __init__(self, address: str, scripthash: str, servers: list[str], chain: str, timeout: int = 5, retry_attempts: int = 3):
+    _is_subscribed = False
+    _cached_wallet_currency = None
+    _cached_wallet_unspent_currency = None
+    _cached_wallet_banner = None
+    _cached_wallet_balance = None
+    _cached_wallet_transaction_history = None
+    _cached_wallet_unspent_assets = None
+    _cached_vault_currency = None
+    _cached_vault_unspent_currency = None
+    _cached_vault_banner = None
+    _cached_vault_balance = None
+    _cached_vault_transaction_history = None
+    _cached_vault_unspent_assets = None
+    
+    def __init__(self, address: str, scripthash: str, servers: list[str], chain: str, connection: ElectrumX = None, last_handshake = None, type = 'wallet', timeout: int = 5, retry_attempts: int = 3):
         self.chain = chain
         self.address = address
         self.scripthash = scripthash
         self.servers = servers
         self.timeout = timeout
         self.retry_attempts = retry_attempts
-        self.conn = None
-        self.last_handshake = None
+        self.conn = connection
+        self.last_handshake = last_handshake
         self.transactions = None
         self.subscription_thread = None
         self.stop_event = Event()
 
         # Cached results ( Private Values )
-        self._balance = None
         self._stats = None
-        self._banner = None
-        self._currency = None
-        self._transaction_history = None
         self.failed_servers = set()
-        self._unspent_currency = None
-        self._unspent_assets = None
+        self.type = type
+        if type == 'wallet':
+            self.scripthash_wallet = scripthash
+        else:
+            self.scripthash_vault = scripthash
+        # self._balance = None
+        # self._banner = None
+        # self._currency = None
+        # self._transaction_history = None
+        # self._unspent_currency = None
+        # self._unspent_assets = None
 
         # Public Values
         self.balance = None
@@ -50,6 +69,7 @@ class ElectrumXAPI:
         # Use a relative path for the headers file
         self.headers_file = os.path.join(self.headers_dir, f"headers_{chain}.json")
         self._load_headers_from_disk()
+        # self.subscribeScriptHash()
 
     def __del__(self):
         # Ensure listener is stopped when the object is deleted
@@ -79,6 +99,7 @@ class ElectrumXAPI:
                     ssl=True,
                     timeout=self.timeout
                 )
+                print(f"!!!!!Connection Made!!!!!! {self.conn}");
                 return self.conn
             except socket.timeout:
                 self.failed_servers.add(hostPort)
@@ -90,7 +111,7 @@ class ElectrumXAPI:
     # Ensure if the connection is established or not
     # Private Method
     def _ensureConnected(self):
-        print(f"Ensure Connection {self.conn}")
+        # print(f"Ensure Connection {self.conn}")
         if not self.conn:
             self.connect()
         elif not self.conn.connected():
@@ -98,22 +119,27 @@ class ElectrumXAPI:
 
     # Handshake method to create the handshake with the ElectrumX server
     def handshake(self) -> bool:
-        print(f"handshake Connection {self.conn}")
+        print(f"handshake Connection {self.last_handshake} {time.time()}")
         self._ensureConnected()
         if self.last_handshake and time.time() - self.last_handshake < 60 * 60:
+            print(f"Already connect to the server")
             return True
 
         for _ in range(self.retry_attempts):
             try:
                 name = f'Satori Node {self.address}'
+                print(f"Name::::::: {name}")
                 assetApiVersion = '1.10'
                 handshake = ElectrumXAPI.interpret(self.conn.send('server.version', name, assetApiVersion))
                 if handshake[0].startswith(f'ElectrumX {self.chain}') and handshake[1] == assetApiVersion:
                     self.last_handshake = time.time()
+                    print("handshake done")
                     return True
             except Exception:
-                self.conn = None  # Force reconnect on the next try
+                # self.conn = None  # Force reconnect on the next try
+                print(f"Error in handshake")
 
+        self.conn = None
         print("Handshake failed after multiple attempts")
         return False
 
@@ -128,6 +154,7 @@ class ElectrumXAPI:
 
         try:
             response = self.conn.send(method, *params)
+            print(f"!!!!!!!!!!!!!!Response Got!!!!!!!!!!! {method}")
             return ElectrumXAPI.interpret(response)
         except socket.timeout as e:
             print(f"Timeout during {method}: {str(e)}")
@@ -139,62 +166,187 @@ class ElectrumXAPI:
     # currency Element
     @property
     def currencyEle(self):
-        if self._currency is None:
+        if self.type == 'wallet':
+            print(f"!!!!!!!!!!!!!!!!!Getting Wallet Currency Element!!!!!!!!!!!!! {ElectrumXAPI._cached_wallet_currency}")
+            if ElectrumXAPI._cached_wallet_currency is not None:
+                return ElectrumXAPI._cached_wallet_currency
+            # Fetch from server if not cached
+            print(f"Fetching {self.scripthash}")
             result = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash)
-            self._currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
-        return self._currency
+            ElectrumXAPI._cached_wallet_currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
+            return ElectrumXAPI._cached_wallet_currency
+        else: 
+            print(f"!!!!!!!!!!!!!!!!!Getting vault Currency Element!!!!!!!!!!!!! {ElectrumXAPI._cached_vault_currency}")
+            if ElectrumXAPI._cached_vault_currency is not None:
+                return ElectrumXAPI._cached_vault_currency
+            # Fetch from server if not cached
+            print(f"Fetching {self.scripthash}")
+            result = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash)
+            ElectrumXAPI._cached_vault_currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
+            return ElectrumXAPI._cached_vault_currency
+        # if self._currency is None:
+        #     result = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash)
+        #     self._currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
+        # return self._currency
 
     # banner Element
     @property
     def bannerEle(self):
-        if self._banner is None:
+        if self.type == 'wallet':
+            print(f"!!!!!!!!!!!!!!!!!Getting Wallet Banner Element!!!!!!!!!!!!! {ElectrumXAPI._cached_wallet_banner}")
+            if ElectrumXAPI._cached_wallet_banner is not None:
+                return ElectrumXAPI._cached_wallet_banner
+            # Fetch from server if not cached
             try:
-                self._banner = self._sendRequest('server.banner', False)
+                ElectrumXAPI._cached_wallet_banner = self._sendRequest('server.banner', False)
             except Exception as e:
                 print(f"Error getting banner: {str(e)}")
-                self._banner = "timeout error - unable to get banner"
-        return self._banner
+                ElectrumXAPI._cached_wallet_banner = "timeout error - unable to get banner"
+            return ElectrumXAPI._cached_wallet_banner
+        else:
+            print(f"!!!!!!!!!!!!!!!!!Getting Vault Banner Element!!!!!!!!!!!!! {ElectrumXAPI._cached_vault_banner}")
+            if ElectrumXAPI._cached_vault_banner is not None:
+                return ElectrumXAPI._cached_vault_banner
+            # Fetch from server if not cached
+            try:
+                ElectrumXAPI._cached_vault_banner = self._sendRequest('server.banner', False)
+            except Exception as e:
+                print(f"Error getting banner: {str(e)}")
+                ElectrumXAPI._cached_vault_banner = "timeout error - unable to get banner"
+            return ElectrumXAPI._cached_vault_banner
+        # if self._banner is None:
+        #     try:
+        #         self._banner = self._sendRequest('server.banner', False)
+        #     except Exception as e:
+        #         print(f"Error getting banner: {str(e)}")
+        #         self._banner = "timeout error - unable to get banner"
+        # return self._banner
 
     # transactionHistory Element method to get the data related to transactions
     @property
     def transactionHistoryEle(self):
-        if self._transaction_history is None:
+        if self.type == 'wallet':
+            print(f"!!!!!!!!!!!!!!!!!Getting Wallet Transaction History Element!!!!!!!!!!!!! {ElectrumXAPI._cached_wallet_transaction_history}")
+            if ElectrumXAPI._cached_wallet_transaction_history is not None:
+                return ElectrumXAPI._cached_wallet_transaction_history
+            # Fetch from server if not cached
             try:
-                self._transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, self.scripthash)
+                ElectrumXAPI._cached_wallet_transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, self.scripthash)
             except Exception as e:
                 print(f"Error getting transaction history: {str(e)}")
-                self._transaction_history = []
-        return self._transaction_history
+                ElectrumXAPI._cached_wallet_transaction_history = []
+            return ElectrumXAPI._cached_wallet_transaction_history
+        else:
+            print(f"!!!!!!!!!!!!!!!!!Getting Vault Transaction History Element!!!!!!!!!!!!! {ElectrumXAPI._cached_vault_transaction_history}")
+            if ElectrumXAPI._cached_vault_transaction_history is not None:
+                return ElectrumXAPI._cached_vault_transaction_history
+            # Fetch from server if not cached
+            try:
+                ElectrumXAPI._cached_vault_transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, self.scripthash)
+            except Exception as e:
+                print(f"Error getting transaction history: {str(e)}")
+                ElectrumXAPI._cached_vault_transaction_history = []
+            return ElectrumXAPI._cached_vault_transaction_history
+    
+        # if self._transaction_history is None:
+        #     try:
+        #         self._transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, self.scripthash)
+        #     except Exception as e:
+        #         print(f"Error getting transaction history: {str(e)}")
+        #         self._transaction_history = []
+        # return self._transaction_history
 
     # unSpentCurrency Element method to get the unSpent currency data
     @property
     def unSpentCurrencyEle(self):
-        if self._unspent_currency is None:
-            self._unspent_currency = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash)
-        return self._unspent_currency
+        if self.type == 'wallet':
+            print(f"!!!!!!!!!!!!!!!!!Getting Wallet Unspent Currency Element!!!!!!!!!!!!! {ElectrumXAPI._cached_wallet_unspent_currency}")
+            if ElectrumXAPI._cached_wallet_unspent_currency is not None:
+                return ElectrumXAPI._cached_wallet_unspent_currency
+            # Fetch from server if not cached
+            ElectrumXAPI._cached_wallet_unspent_currency = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash)
+            return ElectrumXAPI._cached_wallet_unspent_currency
+        else:
+            print(f"!!!!!!!!!!!!!!!!!Getting Vault Unspent Currency Element!!!!!!!!!!!!! {ElectrumXAPI._cached_vault_unspent_currency}")
+            if ElectrumXAPI._cached_vault_unspent_currency is not None:
+                return ElectrumXAPI._cached_vault_unspent_currency
+            # Fetch from server if not cached
+            ElectrumXAPI._cached_vault_unspent_currency = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash)
+            return ElectrumXAPI._cached_vault_unspent_currency
+        # if self._unspent_currency is None:
+        #     self._unspent_currency = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash)
+        # return self._unspent_currency
 
     # unSpentAssets Element method to get the unSpent assets data
     @property
     def unSpentAssetsEle(self):
-        if self._unspent_assets is None:
+        if self.type == 'wallet':
+            print(f"!!!!!!!!!!!!!!!!!Getting Wallet Unspent Assets Element!!!!!!!!!!!!! {ElectrumXAPI._cached_wallet_unspent_assets}")
+            if ElectrumXAPI._cached_wallet_unspent_assets is not None:
+                return ElectrumXAPI._cached_wallet_unspent_assets
+            # Fetch from server if not cached
             if self.chain == 'Evrmore':
-                self._unspent_assets = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash, 'SATORI')
+                ElectrumXAPI._cached_wallet_unspent_assets = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash, 'SATORI')
             else:
-                self._unspent_assets = self._sendRequest('blockchain.scripthash.listassets', False, self.scripthash)
-        return self._unspent_assets
+                ElectrumXAPI._cached_wallet_unspent_assets = self._sendRequest('blockchain.scripthash.listassets', False, self.scripthash)
+            return ElectrumXAPI._cached_wallet_unspent_assets
+        else: 
+            print(f"!!!!!!!!!!!!!!!!!Getting Vault Unspent Assets Element!!!!!!!!!!!!! {ElectrumXAPI._cached_vault_unspent_assets}")
+            if ElectrumXAPI._cached_vault_unspent_assets is not None:
+                return ElectrumXAPI._cached_vault_unspent_assets
+            # Fetch from server if not cached
+            if self.chain == 'Evrmore':
+                ElectrumXAPI._cached_vault_unspent_assets = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash, 'SATORI')
+            else:
+                ElectrumXAPI._cached_vault_unspent_assets = self._sendRequest('blockchain.scripthash.listassets', False, self.scripthash)
+            return ElectrumXAPI._cached_vault_unspent_assets
+    
+        # if self._unspent_assets is None:
+        #     if self.chain == 'Evrmore':
+        #         self._unspent_assets = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash, 'SATORI')
+        #     else:
+        #         self._unspent_assets = self._sendRequest('blockchain.scripthash.listassets', False, self.scripthash)
+        # return self._unspent_assets
 
     # balance Element for both type of wallet
     @property
     def balanceEle(self):
-        if self._balance is None:
+        if self.type == 'wallet':
+            print(f"!!!!!!!!!!!!!!!!!Getting Wallet Balance Element!!!!!!!!!!!!! {ElectrumXAPI._cached_wallet_balance}")
+            if ElectrumXAPI._cached_wallet_balance is not None:
+                return ElectrumXAPI._cached_wallet_balance
+            # Fetch from server if not cached
             if self.chain == 'Evrmore':
                 self.balances = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash, 'SATORI')
-                self._balance = self.balances.get(
+                ElectrumXAPI._cached_wallet_balance = self.balances.get(
                     'confirmed', 0) + self.balances.get('unconfirmed', 0)
             else:
                 self.balances = self._sendRequest('blockchain.scripthash.get_asset_balance', False, self.scripthash)
-                self._balance = self.balances.get('confirmed', {}).get('SATORI', 0)
-        return self._balance
+                ElectrumXAPI._cached_wallet_balance = self.balances.get('confirmed', {}).get('SATORI', 0)
+            return ElectrumXAPI._cached_wallet_balance
+        else:
+            print(f"!!!!!!!!!!!!!!!!!Getting Vault Balance Element!!!!!!!!!!!!! {ElectrumXAPI._cached_vault_balance}")
+            if ElectrumXAPI._cached_vault_balance is not None:
+                return ElectrumXAPI._cached_vault_balance
+            # Fetch from server if not cached
+            if self.chain == 'Evrmore':
+                self.balances = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash, 'SATORI')
+                ElectrumXAPI._cached_vault_balance = self.balances.get(
+                    'confirmed', 0) + self.balances.get('unconfirmed', 0)
+            else:
+                self.balances = self._sendRequest('blockchain.scripthash.get_asset_balance', False, self.scripthash)
+                ElectrumXAPI._cached_vault_balance = self.balances.get('confirmed', {}).get('SATORI', 0)
+            return ElectrumXAPI._cached_vault_balance
+    
+        # if self._balance is None:
+        #     if self.chain == 'Evrmore':
+        #         self.balances = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash, 'SATORI')
+        #         self._balance = self.balances.get(
+        #             'confirmed', 0) + self.balances.get('unconfirmed', 0)
+        #     else:
+        #         self.balances = self._sendRequest('blockchain.scripthash.get_asset_balance', False, self.scripthash)
+        #         self._balance = self.balances.get('confirmed', {}).get('SATORI', 0)
+        # return self._balance
 
     # getTransaction Method to get the transaction
     def getTransaction(self, tx_hash: str, throttle: int = 0.34):
@@ -241,6 +393,7 @@ class ElectrumXAPI:
         # Ensure the connection is established and handshake is performed
         if not self.handshake():
             return False
+        print(f"Getting data")
 
         # Using the new properties to fetch data
         self.currency = self.currencyEle
@@ -266,54 +419,101 @@ class ElectrumXAPI:
                 txs = [self.getTransaction(vin.get('txid', '')) for vin in raw.get('vin', [])]
                 self.transactions.append(TransactionStruct(raw=raw, vinVoutsTxs=txs))
 
-    def _fetch_and_update_currency(self):
-        result = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash)
-        self._currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
-        self.currency = self._currency
-
-    def _fetch_and_update_banner(self):
-        try:
-            self._banner = self._sendRequest('server.banner', False)
-        except Exception as e:
-            print(f"Error getting banner: {str(e)}")
-            self._banner = "timeout error - unable to get banner"
-        self.banner = self._banner
-
-    def _fetch_and_update_transaction_history(self):
-        try:
-            self._transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, self.scripthash)
-        except Exception as e:
-            print(f"Error getting transaction history: {str(e)}")
-            self._transaction_history = []
-        self.transactionHistory = self._transaction_history
-
-    def _fetch_and_update_unspent_currency(self):
-        self._unspent_currency = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash)
-        self.unspentCurrency = self._unspent_currency
-
-    def _fetch_and_update_balance(self):
-        if self.chain == 'Evrmore':
-            self.balances = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash, 'SATORI')
-            self._balance = self.balances.get('confirmed', 0) + self.balances.get('unconfirmed', 0)
+    def _fetch_and_update_currency(self, scripthash: str):
+        # result = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash)
+        # self._currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
+        # self.currency =  self._currency
+        if scripthash == self.scripthash_wallet:
+            result = self._sendRequest('blockchain.scripthash.get_balance', False, scripthash)
+            ElectrumXAPI._cached_wallet_currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
+            self.currency =  ElectrumXAPI._cached_wallet_currency
         else:
-            self.balances = self._sendRequest('blockchain.scripthash.get_asset_balance', False, self.scripthash)
-            self._balance = self.balances.get('confirmed', {}).get('SATORI', 0)
-        self.balance = self._balance
+            result = self._sendRequest('blockchain.scripthash.get_balance', False, scripthash)
+            ElectrumXAPI._cached_vault_currency = (result or {}).get('confirmed', 0) + (result or {}).get('unconfirmed', 0)
+            self.currency =  ElectrumXAPI._cached_vault_currency
 
-    def _fetch_and_update_unspent_assets(self):
-        if self.chain == 'Evrmore':
-            self._unspent_assets = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash, 'SATORI')
+    def _fetch_and_update_transaction_history(self, scripthash: str):
+        # try:
+        #     self._transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, self.scripthash)
+        # except Exception as e:
+        #     print(f"Error getting transaction history: {str(e)}")
+        #     self._transaction_history = []
+        # self.transactionHistory = self._transaction_history
+        if scripthash == self.scripthash_wallet:
+            try:
+                ElectrumXAPI._cached_wallet_transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, scripthash)
+            except Exception as e:
+                print(f"Error getting transaction history: {str(e)}")
+                ElectrumXAPI._cached_wallet_transaction_history = []
+            self.transactionHistory = ElectrumXAPI._cached_wallet_transaction_history
         else:
-            self._unspent_assets = self._sendRequest('blockchain.scripthash.listassets', False, self.scripthash)
-        self.unspentAssets = self._unspent_assets
+            try:
+                ElectrumXAPI._cached_vault_transaction_history = self._sendRequest('blockchain.scripthash.get_history', False, scripthash)
+            except Exception as e:
+                print(f"Error getting transaction history: {str(e)}")
+                ElectrumXAPI._cached_vault_transaction_history = []
+            self.transactionHistory = ElectrumXAPI._cached_vault_transaction_history
 
-    def _fetch_and_update_all(self):
-        self._fetch_and_update_currency()
-        self._fetch_and_update_banner()
-        self._fetch_and_update_transaction_history()
-        self._fetch_and_update_unspent_currency()
-        self._fetch_and_update_balance()
-        self._fetch_and_update_unspent_assets()
+    def _fetch_and_update_unspent_currency(self, scripthash: str):
+        # self._unspent_currency = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash)
+        # self.unspentCurrency = self._unspent_currency
+        if scripthash == self.scripthash_wallet:
+            ElectrumXAPI._cached_wallet_unspent_currency = self._sendRequest('blockchain.scripthash.listunspent', False, scripthash)
+            self.unspentCurrency = ElectrumXAPI._cached_wallet_unspent_currency
+        else: 
+            ElectrumXAPI._cached_vault_unspent_currency = self._sendRequest('blockchain.scripthash.listunspent', False, scripthash)
+            self.unspentCurrency = ElectrumXAPI._cached_vault_unspent_currency
+
+    def _fetch_and_update_balance(self, scripthash: str):
+        # if self.chain == 'Evrmore':
+        #     self.balances = self._sendRequest('blockchain.scripthash.get_balance', False, self.scripthash, 'SATORI')
+        #     self._balance = self.balances.get('confirmed', 0) + self.balances.get('unconfirmed', 0)
+        # else:
+        #     self.balances = self._sendRequest('blockchain.scripthash.get_asset_balance', False, self.scripthash)
+        #     self._balance = self.balances.get('confirmed', {}).get('SATORI', 0)
+        # self.balance = self._balance
+        if scripthash == self.scripthash_wallet:
+            if self.chain == 'Evrmore':
+                self.balances = self._sendRequest('blockchain.scripthash.get_balance', False, scripthash, 'SATORI')
+                ElectrumXAPI._cached_wallet_balance = self.balances.get('confirmed', 0) + self.balances.get('unconfirmed', 0)
+            else:
+                self.balances = self._sendRequest('blockchain.scripthash.get_asset_balance', False, scripthash)
+                ElectrumXAPI._cached_wallet_balance = self.balances.get('confirmed', {}).get('SATORI', 0)
+            self.balance = ElectrumXAPI._cached_wallet_balance
+        else:
+            if self.chain == 'Evrmore':
+                self.balances = self._sendRequest('blockchain.scripthash.get_balance', False, scripthash, 'SATORI')
+                ElectrumXAPI._cached_vault_balance = self.balances.get('confirmed', 0) + self.balances.get('unconfirmed', 0)
+            else:
+                self.balances = self._sendRequest('blockchain.scripthash.get_asset_balance', False, scripthash)
+                ElectrumXAPI._cached_vault_balance = self.balances.get('confirmed', {}).get('SATORI', 0)
+            self.balance = ElectrumXAPI._cached_vault_balance
+
+    def _fetch_and_update_unspent_assets(self, scripthash: str):
+        # if self.chain == 'Evrmore':
+        #     self._unspent_assets = self._sendRequest('blockchain.scripthash.listunspent', False, self.scripthash, 'SATORI')
+        # else:
+        #     self._unspent_assets = self._sendRequest('blockchain.scripthash.listassets', False, self.scripthash)
+        # self.unspentAssets = self._unspent_assets
+        if scripthash == self.scripthash_wallet:
+            if self.chain == 'Evrmore':
+                ElectrumXAPI._cached_wallet_unspent_assets = self._sendRequest('blockchain.scripthash.listunspent', False, scripthash, 'SATORI')
+            else:
+                ElectrumXAPI._cached_wallet_unspent_assets = self._sendRequest('blockchain.scripthash.listassets', False, scripthash)
+            self.unspentAssets = ElectrumXAPI._cached_wallet_unspent_assets
+        else:
+            if self.chain == 'Evrmore':
+                ElectrumXAPI._cached_vault_unspent_assets = self._sendRequest('blockchain.scripthash.listunspent', False, scripthash, 'SATORI')
+            else:
+                ElectrumXAPI._cached_vault_unspent_assets = self._sendRequest('blockchain.scripthash.listassets', False, scripthash)
+            self.unspentAssets = ElectrumXAPI._cached_vault_unspent_assets
+
+    def _fetch_and_update_all(self, scripthash: str):
+        self._fetch_and_update_currency(scripthash)
+        self._fetch_and_update_transaction_history(scripthash)
+        self._fetch_and_update_unspent_currency(scripthash)
+        self._fetch_and_update_balance(scripthash)
+        self._fetch_and_update_unspent_assets(scripthash)
 
     # New method for subscribing to a scripthash and listening for updates
     def subscribeScriptHash(self):
@@ -321,9 +521,14 @@ class ElectrumXAPI:
         Subscribe to the scripthash and start listening for updates.
         """
         # Ensure the connection is established and handshake is performed
-        print("subscribeScriptHash started")
+        print(f"subscribeScriptHash started")
         if not self.handshake():
             return Exception("Not connected to ElectrumX server.")
+        
+        # Check if already subscribed
+        if ElectrumXAPI._is_subscribed:
+            print("Already subscribed to scripthash.")
+            return
 
         # Subscribe to the scripthash
         initial_status = self._sendRequest('blockchain.scripthash.subscribe', False, self.scripthash)
@@ -336,7 +541,9 @@ class ElectrumXAPI:
         # Start a thread to listen for updates
         self.subscription_thread = Thread(target=self._processNotifications)
         self.subscription_thread.start()
-
+        
+        ElectrumXAPI._is_subscribed = True
+        
     # _processNotifications method to listening for updates
     def _processNotifications(self):
         """
@@ -357,7 +564,7 @@ class ElectrumXAPI:
                             scripthash, status = notification['params']
                             if scripthash == self.scripthash:
                                 print(f"Received update for scripthash {scripthash}: {status}")
-                                self._fetch_and_update_all()
+                                self._fetch_and_update_all(scripthash)
                     elif notification['method'] == 'blockchain.headers.subscribe':
                         if 'params' in notification and len(notification['params']) > 0:
                             header = notification['params'][0]
