@@ -5,7 +5,7 @@ import select
 
 
 class Connector:
-    def __init__(self, host, port, ssl=False, timeout=5, network='mainnet'):
+    def __init__(self, host, port, ssl=False, timeout=60*60, network='mainnet'):
         # self.log.log(15, "Starting...")
         self.host = host
         self.port = port
@@ -14,7 +14,7 @@ class Connector:
         self.network = network
         self.connection = None
         print(f'{self.host}:{self.port}', self.network)
-        self._connect()
+        self.connect()
 
     def connected(self) -> bool:
         # problem:   File "/Satori/Wallet/satoriwallet/api/blockchain/electrumx/connector.py", line 19, in connected
@@ -39,8 +39,7 @@ class Connector:
         except Exception as e:
             return False
 
-    def _connect(self):
-
+    def connect(self):
         # self.log.log(10, "_connect {} {}".format(self.host, self.port))
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connection.settimeout(self.timeout)
@@ -58,3 +57,6 @@ class Connector:
             logging.error(
                 f'error connecting to {self.host}:{str(self.port)} {e}')
             raise e
+
+    def disconnect(self):
+        self.connection.close()
