@@ -47,7 +47,7 @@ class ElectrumXAPI:
         else:
             self.scripthash_vault = scripthash
         # self._balance = None
-        # self._banner = None
+        self._banner = None
         # self._currency = None
         # self._transaction_history = None
         # self._unspent_currency = None
@@ -194,11 +194,13 @@ class ElectrumXAPI:
     def bannerEle(self):
         if self.type == 'wallet':
             print(f"!!!!!!!!!!!!!!!!!Getting Wallet Banner Element!!!!!!!!!!!!! {ElectrumXAPI._cached_wallet_banner}")
+            print(f"!!!!!!!!!!!!!!!!!Getting Banner Element!!!!!!!!!!!!! {self._banner}")
             if ElectrumXAPI._cached_wallet_banner is not None:
                 return ElectrumXAPI._cached_wallet_banner
             # Fetch from server if not cached
             try:
                 ElectrumXAPI._cached_wallet_banner = self._sendRequest('server.banner', False)
+                self._banner = ElectrumXAPI._cached_wallet_banner
             except Exception as e:
                 print(f"Error getting banner: {str(e)}")
                 ElectrumXAPI._cached_wallet_banner = "timeout error - unable to get banner"
@@ -210,6 +212,7 @@ class ElectrumXAPI:
             # Fetch from server if not cached
             try:
                 ElectrumXAPI._cached_vault_banner = self._sendRequest('server.banner', False)
+                # self._banner = ElectrumXAPI._cached_vault_banner
             except Exception as e:
                 print(f"Error getting banner: {str(e)}")
                 ElectrumXAPI._cached_vault_banner = "timeout error - unable to get banner"
