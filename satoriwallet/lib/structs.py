@@ -101,6 +101,6 @@ class TransactionStruct():
         # Validate Ethereum address
         if not callable(valid_eth_address):
             return address
-        if valid_eth_addresss(address):
+        if is_valid_ethereum_address(address):
             return address
         return None
