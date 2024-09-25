@@ -1,9 +1,12 @@
 from typing import Union
 
+from satoriwallet.lib.ethereum.valid_eth import isValidEthereumAddress
+
 
 class TransactionStruct():
 
     def __init__(self, raw, vinVoutsTxs):
+        self.raw = raw
         self.txid = self.getTxid(raw)
         self.height = self.getHeight(raw)
         self.confirmations = self.getConfirmations(raw)
@@ -27,7 +30,7 @@ class TransactionStruct():
                 name = vout.get('asset', {}).get('name', 'unknown asset')
                 amount = float(vout.get('asset', {}).get('amount', 0))
             else:
-                name = 'Ravencoin'
+                name = 'EVR'
                 amount = float(vout.get('value', 0))
             if name in sent:
                 sent[name] = sent[name] + amount
@@ -48,7 +51,7 @@ class TransactionStruct():
                             amount = float(
                                 vout.get('asset', {}).get('amount', 0))
                         else:
-                            name = 'Ravencoin'
+                            name = 'EVR'
                             amount = float(vout.get('value', 0))
                         if name in received:
                             received[name] = received[name] + amount
@@ -101,6 +104,6 @@ class TransactionStruct():
         # Validate Ethereum address
         if not callable(valid_eth_address):
             return address
-        if is_valid_ethereum_address(address):
+        if isValidEthereumAddress(address):
             return address
         return None
