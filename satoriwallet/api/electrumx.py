@@ -13,7 +13,6 @@ class ElectrumxAPI():
         servers: list[str],
         chain: str,
         connection: Electrumx = None,
-        last_handshake=None,
         timeout: int = 5,
         retry_attempts: int = 3,
         onScripthashNotification=None,
@@ -26,7 +25,7 @@ class ElectrumxAPI():
         self.timeout = timeout
         self.retry_attempts = retry_attempts
         self.conn = connection
-        self.last_handshake = last_handshake
+        self.last_handshake = None  # time.time()
         self.transactions = None
         self.subscriptions = {}
         self.stop_all_subscriptions = Event()
@@ -89,10 +88,9 @@ class ElectrumxAPI():
                     self.last_handshake = time.time()
                     return True
             except Exception as e:
-                self.log.error(
-                    f'error in handshake {self.host}:{str(self.port)} {e}')
+                print(f'error in handshake {e}')
                 continue
-        self.log.error("Handshake failed after multiple attempts")
+        print("Handshake failed after multiple attempts")
         self.conn.disconnect()
         return False
 
@@ -176,7 +174,7 @@ class ElectrumxAPI():
         if self.chain == 'Evrmore':
             balances = self._sendRequest(
                 'blockchain.scripthash.get_balance', False, self.scripthash, 'SATORI')
-            return balances.get('confirmed', 0) + self.balances.get('unconfirmed', 0)
+            return balances.get('confirmed', 0) + balances.get('unconfirmed', 0)
         else:
             return self._sendRequest(
                 'blockchain.scripthash.get_asset_balance', False, self.scripthash).get('confirmed', {}).get('SATORI', 0)

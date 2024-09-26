@@ -10,14 +10,35 @@ class Electrumx(Connector):
     def __init__(self, *args, **kwargs):
         self.log = logging.getLogger(type(self).__name__)
         super(type(self), self).__init__(*args, **kwargs)
+        self.last_handshake = 0
+        self.handshaked = None
+        # self.handshake()
 
     def connected(self) -> bool:
         if self.connection is None:
             return False
-        self.connection.settimeout(.5)
-        if self.send('server.ping') == None:
+        try:
+            self.connection.settimeout(10)
+            return True
+        except Exception as e:
+            self.log.error(f"error setting timeout {e}")
             return False
-        return True
+        #if self.send('server.ping') == None:
+        #    return False
+        #return True
+
+    def handshake(self):
+        try:
+            name = f'Satori Node {time.time()}'
+            assetApiVersion = '1.10'
+            self.handshaked = self.send(
+                'server.version',
+                name,
+                assetApiVersion)
+            self.last_handshake = time.time()
+            return True
+        except Exception as e:
+            print(f'error in handshake {e}')
 
     def _receive(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
         if timeout is not None:
