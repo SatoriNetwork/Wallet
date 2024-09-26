@@ -5,39 +5,41 @@ import select
 
 
 class Connector:
-    def __init__(self, host, port, ssl=False, timeout=60*60, network='mainnet'):
+    def __init__(self, host, port, ssl=False, timeout=10*60, network='mainnet'):
         # self.log.log(15, "Starting...")
         self.host = host
         self.port = port
         self.ssl = ssl
         self.timeout = timeout
         self.network = network
-        self.connection = None
+        self.connection: socket.socket = None
         print(f'{self.host}:{self.port}', self.network)
         self.connect()
 
     def connected(self) -> bool:
+        if self.connection is None:
+            return False
+        return True
+        # # this solution gave false positives:
         # problem:   File "/Satori/Wallet/satoriwallet/api/blockchain/electrumx/connector.py", line 19, in connected
         #           return self.connection is not None and self.connection.connected
         #           AttributeError: 'SSLSocket' object has no attribute 'connected
         # return self.connection is not None and self.connection.connected
-        if self.connection is None:
-            return False
-        try:
-            # Use select to check if the socket is readable
-            # which would imply it's either still connected or has been closed
-            ready = select.select([self.connection], [], [], 0.5)
-            if ready[0]:
-                # Perform a non-blocking check
-                # If recv returns an empty string, the socket is closed
-                data = self.connection.recv(16, socket.MSG_DONTWAIT)
-                return len(data) != 0
-            return True  # No data, but socket is not closed
-        except (socket.error, OSError) as e:
-            # An error in recv likely means the socket is closed
-            return False
-        except Exception as e:
-            return False
+        # try:
+        #    # Use select to check if the socket is readable
+        #    # which would imply it's either still connected or has been closed
+        #    ready = select.select([self.connection], [], [], 0.5)
+        #    if ready[0]:
+        #        # Perform a non-blocking check
+        #        # If recv returns an empty string, the socket is closed
+        #        data = self.connection.recv(16, socket.MSG_DONTWAIT)
+        #        return len(data) != 0
+        #    return True  # No data, but socket is not closed
+        # except (socket.error, OSError) as e:
+        #    # An error in recv likely means the socket is closed
+        #    return False
+        # except Exception as e:
+        #    return False
 
     def connect(self):
         # self.log.log(10, "_connect {} {}".format(self.host, self.port))

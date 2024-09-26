@@ -1,5 +1,5 @@
 from satoriwallet.lib.structs import TransactionStruct
-from satoriwallet.api.blockchain import ElectrumX
+from satoriwallet.api.blockchain import Electrumx
 import time
 import random
 import json
@@ -17,7 +17,7 @@ w = _evrmoreWallet()
 
 
 hostPort = 'electrum2-mainnet.evrmorecoin.org:50002'
-e = ElectrumX(host=hostPort.split(':')[0], port=int(
+e = Electrumx(host=hostPort.split(':')[0], port=int(
     hostPort.split(':')[1]), ssl=True, timeout=5)
 e.send('server.version', 'SATORI', '1.10')
 

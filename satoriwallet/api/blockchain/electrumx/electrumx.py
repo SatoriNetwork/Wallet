@@ -1,3 +1,4 @@
+from typing import Union
 import logging
 import socket
 import json
@@ -5,42 +6,53 @@ import time
 from .connector import Connector
 
 
-class ElectrumX(Connector):
+class Electrumx(Connector):
     def __init__(self, *args, **kwargs):
         self.log = logging.getLogger(type(self).__name__)
         super(type(self), self).__init__(*args, **kwargs)
 
-    def _receive(self):
-        buffer = ''
-        while True:
-            try:
-                raw = self.connection.recv(1024*16).decode('utf-8')
-                buffer += raw
-                if '\n' in raw:
-                    # Assuming messages are newline-terminated, split on the first newline.
-                    # This is useful in case multiple messages are received or a message is exactly at the boundary.
-                    message, _, buffer = buffer.partition('\n')
-                    try:
-                        r = json.loads(message)
-                        self.log.log(5, "_receive {}".format(r))
-                        return r  # Return the parsed JSON object
-                    except json.decoder.JSONDecodeError as e:
-                        # Log the error and the problematic message part
-                        self.log.error(
-                            "JSONDecodeError: {} in message: {}".format(e, message))
-                        # Optionally, handle incomplete message scenarios by breaking or continuing
-                        # For now, let's break to avoid an infinite loop
-                        break
-            except socket.timeout:
-                print("Socket timeout occurred during receive.")
-                return None  # Timeout, no message received
-            except Exception as e:
-                print(f"Socket error during receive: {str(e)}")
-                return None
-            # Optionally, implement a mechanism to prevent an infinite loop if the server sends data that never includes a newline
-        return None  # or return an appropriate error/value
+    def connected(self) -> bool:
+        if self.connection is None:
+            return False
+        self.connection.settimeout(.5)
+        if self.send('server.ping') == None:
+            return False
+        return True
 
-    def send(self, method, *args):
+    def _receive(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
+        if timeout is not None:
+            self.connection.settimeout(timeout)
+        buffer = ''
+        try:
+            while True:
+                try:
+                    raw = self.connection.recv(1024 * 16).decode('utf-8')
+                    buffer += raw
+                    if '\n' in raw:
+                        # Split on the first newline to handle multiple messages
+                        message, _, buffer = buffer.partition('\n')
+                        try:
+                            r = json.loads(message)
+                            self.log.log(5, "_receive {}".format(r))
+                            return r  # Return the parsed JSON object
+                        except json.decoder.JSONDecodeError as e:
+                            # Log the error and the problematic message part
+                            self.log.error(
+                                "JSONDecodeError: {} in message: {}".format(e, message))
+                            # Optionally continue or break depending on the scenario
+                            break
+                except socket.timeout:
+                    self.log.warning("Socket timeout occurred during receive.")
+                    return None  # Timeout, no message received
+                except Exception as e:
+                    self.log.error(f"Socket error during receive: {str(e)}")
+                    return None
+        finally:
+            # Reset the timeout to blocking mode
+            self.connection.settimeout(None)
+        return None
+
+    def send(self, method, *args, **kwargs):
         payload = json.dumps(
             {
                 "jsonrpc": "2.0",
