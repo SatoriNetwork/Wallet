@@ -12,13 +12,13 @@ class Electrumx(Connector):
         super(type(self), self).__init__(*args, **kwargs)
         self.last_handshake = 0
         self.handshaked = None
-        # self.handshake()
+        self.handshake()
 
     def connected(self) -> bool:
         if self.connection is None:
             return False
         try:
-            self.connection.settimeout(10)
+            # self.connection.settimeout(10)
             return True
         except Exception as e:
             self.log.error(f"error setting timeout {e}")
@@ -31,6 +31,7 @@ class Electrumx(Connector):
         try:
             name = f'Satori Node {time.time()}'
             assetApiVersion = '1.10'
+            print(f'handshake {name} {assetApiVersion}')
             self.handshaked = self.send(
                 'server.version',
                 name,
@@ -38,7 +39,7 @@ class Electrumx(Connector):
             self.last_handshake = time.time()
             return True
         except Exception as e:
-            print(f'error in handshake {e}')
+            print(f'error in handshake initial {e}')
 
     def _receive(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
         if timeout is not None:
