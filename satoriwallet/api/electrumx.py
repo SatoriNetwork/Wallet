@@ -13,6 +13,7 @@ class ElectrumxAPI():
         servers: list[str],
         chain: str,
         connection: Electrumx = None,
+        type: str = 'wallet',
         timeout: int = 5,
         retry_attempts: int = 3,
         onScripthashNotification=None,
@@ -25,7 +26,7 @@ class ElectrumxAPI():
         self.timeout = timeout
         self.retry_attempts = retry_attempts
         self.conn = connection
-        self.last_handshake = None  # time.time()
+        self.last_handshake = time.time()
         self.transactions = None
         self.subscriptions = {}
         self.stop_all_subscriptions = Event()
@@ -37,6 +38,7 @@ class ElectrumxAPI():
         self.onScripthashNotification = onScripthashNotification
         self.onBlockNotification = onBlockNotification
         self.lastBlockTime = 0
+        self.type = type
 
     def connected(self):
         if (
@@ -162,11 +164,13 @@ class ElectrumxAPI():
         if self.chain == 'Evrmore':
             return self._sendRequest(
                 'blockchain.scripthash.listunspent',
+                False,
                 self.scripthash,
                 'SATORI')
         else:
             return self._sendRequest(
                 'blockchain.scripthash.listassets',
+                False,
                 self.scripthash)
 
     def getBalance(self):
@@ -235,9 +239,11 @@ class ElectrumxAPI():
             self.stop_all_subscriptions.set()
             self.stopScripthashSubscription()
             self.stopHeaderSubscription()
+        print("Starting the Subscriptions")
         self.stop_all_subscriptions.clear()
         self.subscribeScriptHash()
-        self.subscribeBlockHeaders()
+        if self.type == 'vault':
+            self.subscribeBlockHeaders()
 
     # New method for subscribing to a scripthash and listening for updates
     def subscribeScriptHash(self):
@@ -332,7 +338,7 @@ class ElectrumxAPI():
         """
         Stops the subscription thread.
         """
-        print(f"Stop subscription started {self.subscriptions['scripthash']}")
+        print(f"Stop scripthash subscription started {self.subscriptions['scripthash']}")
 
         if self.subscriptions['scripthash'] and self.subscriptions['scripthash'].is_alive():
             # Unsubscribe from the scripthash
@@ -345,13 +351,6 @@ class ElectrumxAPI():
                 print(
                     f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
 
-            # Unsubscribe from the header subscription
-            try:
-                self._sendRequest('blockchain.headers.unsubscribe', True)
-                print("Unsubscribed from headers")
-            except Exception as e:
-                print(f"Error while unsubscribing from headers: {str(e)}")
-
             self.subscriptions['scripthash'].join()
             print(
                 f"Stopped subscription thread for scripthash {self.scripthash}")
@@ -363,19 +362,9 @@ class ElectrumxAPI():
         """
         Stops the subscription thread.
         """
-        print(f"Stop subscription started {self.subscriptions['block']}")
+        print(f"Stop header subscription started {self.subscriptions['block']}")
 
         if self.subscriptions['block'] and self.subscriptions['block'].is_alive():
-            # Unsubscribe from the scripthash
-            try:
-                self._sendRequest(
-                    'blockchain.scripthash.unsubscribe', True, self.scripthash)
-                print(
-                    f"Unsubscribed from scripthash {self.scripthash}")
-            except Exception as e:
-                print(
-                    f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
-
             # Unsubscribe from the header subscription
             try:
                 self._sendRequest('blockchain.headers.unsubscribe', True)
@@ -385,4 +374,4 @@ class ElectrumxAPI():
 
             self.subscriptions['block'].join()
             print(
-                f"Stopped subscription thread for scripthash {self.scripthash}")
+                f"Stopped header subscription thread")
