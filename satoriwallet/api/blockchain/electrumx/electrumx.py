@@ -23,9 +23,9 @@ class Electrumx(Connector):
         except Exception as e:
             self.log.error(f"error setting timeout {e}")
             return False
-        #if self.send('server.ping') == None:
+        # if self.send('server.ping') == None:
         #    return False
-        #return True
+        # return True
 
     def handshake(self):
         try:
@@ -88,6 +88,19 @@ class Electrumx(Connector):
         self.connection.send(payload)
         return self._receive()
 
+    def sendSubscription(self, method, *args, **kwargs):
+        payload = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": int(time.time()*1000),
+                "method": method,
+                "params": args
+            }
+        ) + '\n'
+        payload = payload.encode()
+        self.log.log(5, "send {} {}".format(method, args))
+        self.connection.send(payload)
+
     def receive_notifications(self):
         """
         Continuously listens for notifications from the server.
@@ -95,6 +108,7 @@ class Electrumx(Connector):
         while True:
             try:
                 update = self._receive()
+                print('update', update)
                 if update and 'method' in update:
                     if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe']:
                         yield update
@@ -102,7 +116,7 @@ class Electrumx(Connector):
                         print(f"Received unknown method: {update['method']}")
                 elif update is None:
                     print("Received None update, breaking loop")
-                    break  # Handle the case where the connection might have dropped
+                    # break  # Handle the case where the connection might have dropped
             except Exception as e:
                 print(f"Error in receive_notifications: {str(e)}")
                 break

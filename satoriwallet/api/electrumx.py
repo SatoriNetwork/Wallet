@@ -1,3 +1,4 @@
+import random
 from typing import Union, Dict
 from threading import Thread, Event
 import socket
@@ -39,6 +40,8 @@ class ElectrumxAPI():
         self.onBlockNotification = onBlockNotification
         self.lastBlockTime = 0
         self.type = type
+        if self.conn is None:
+            self.conn = self.makeConnection()
 
     def connected(self):
         if (
@@ -47,6 +50,33 @@ class ElectrumxAPI():
         ):
             return False
         return self.conn is not None and self.conn.connected()
+
+    def makeConnection(self):
+        if len(self.servers) == 0:
+            return
+        tries = 0
+        failedServers = []
+        while tries <= len(self.servers):
+            tries += 1
+            hostPort = random.choice(self.servers)
+            if hostPort in failedServers:
+                continue
+            try:
+                return Electrumx(
+                    host=hostPort.split(':')[0],
+                    port=int(hostPort.split(':')[1]),
+                    ssl=True)
+            except socket.timeout:
+                failedServers.append(hostPort)
+                continue
+            except Exception as _:
+                failedServers.append(hostPort)
+                continue
+        hostPort = random.choice(self.servers)
+        return Electrumx(
+            host=hostPort.split(':')[0],
+            port=int(hostPort.split(':')[1]),
+            ssl=True)
 
     def connect(self):
         if len(self.servers) == 0:
@@ -124,6 +154,21 @@ class ElectrumxAPI():
             response = self.conn.send(method, *params)
             print(f"!!!!!!!!!!!!!!Response Got!!!!!!!!!!! {method}")
             return ElectrumxAPI.interpret(response)
+        except socket.timeout as e:
+            print(f"Timeout during {method}: {str(e)}")
+            raise
+        except Exception as e:
+            print(f"Error during {method}: {str(e)}")
+            raise
+
+    def _sendSubscriptionRequest(self, method: str, checkConnection=True, *params):
+        if checkConnection:
+            self._ensureConnected()
+            # To check whether the connection is till active or not
+            if not self.handshake():
+                raise Exception("Handshake failed")
+        try:
+            self.conn.sendSubscription(method, *params)
         except socket.timeout as e:
             print(f"Timeout during {method}: {str(e)}")
             raise
@@ -242,6 +287,7 @@ class ElectrumxAPI():
         print("Starting the Subscriptions")
         self.stop_all_subscriptions.clear()
         self.subscribeScriptHash()
+        # results in ssl issues
         if self.type == 'vault':
             self.subscribeBlockHeaders()
 
@@ -259,7 +305,7 @@ class ElectrumxAPI():
             raise Exception("Not connected to Electrumx server.")
 
         # Subscribe to the scripthash
-        initial_status = self._sendRequest(
+        initial_status = self._sendSubscriptionRequest(
             'blockchain.scripthash.subscribe', False, self.scripthash)
         print(
             f"Initial status for scripthash {self.scripthash}: {initial_status}")
@@ -283,8 +329,8 @@ class ElectrumxAPI():
             raise Exception("Not connected to Electrumx server.")
 
         # Subscribe to the headers for new block
-        initial_status_header = self._sendRequest(
-            'blockchain.headers.subscribe', False)
+        initial_status_header = self._sendSubscriptionRequest(
+            'blockchain.headers.subscribe', False, True)
         print(f"Initial status for header: {initial_status_header}")
 
         # Start a thread to listen for updates
@@ -338,7 +384,8 @@ class ElectrumxAPI():
         """
         Stops the subscription thread.
         """
-        print(f"Stop scripthash subscription started {self.subscriptions['scripthash']}")
+        print(
+            f"Stop scripthash subscription started {self.subscriptions['scripthash']}")
 
         if self.subscriptions['scripthash'] and self.subscriptions['scripthash'].is_alive():
             # Unsubscribe from the scripthash
@@ -362,7 +409,8 @@ class ElectrumxAPI():
         """
         Stops the subscription thread.
         """
-        print(f"Stop header subscription started {self.subscriptions['block']}")
+        print(
+            f"Stop header subscription started {self.subscriptions['block']}")
 
         if self.subscriptions['block'] and self.subscriptions['block'].is_alive():
             # Unsubscribe from the header subscription
