@@ -222,7 +222,7 @@ class ElectrumxAPI():
         # {'jsonrpc': '2.0', 'result': {'confirmed': 0, 'unconfirmed': 0}, 'id': 1719672672565}
         if self.chain == 'Evrmore':
             balances = self._sendRequest(
-                'blockchain.scripthash.get_balance', False, self.scripthash, 'SATORI')
+                'blockchain.scripthash.get_asset_balance', False, self.scripthash, 'SATORI')
             return balances.get('confirmed', 0) + balances.get('unconfirmed', 0)
         else:
             return self._sendRequest(
@@ -287,7 +287,6 @@ class ElectrumxAPI():
         print("Starting the Subscriptions")
         self.stop_all_subscriptions.clear()
         self.subscribeScriptHash()
-        # results in ssl issues
         if self.type == 'vault':
             self.subscribeBlockHeaders()
 
@@ -310,11 +309,6 @@ class ElectrumxAPI():
         print(
             f"Initial status for scripthash {self.scripthash}: {initial_status}")
 
-        # Start a thread to listen for updates
-        self.subscriptions['scripthash'] = Thread(
-            target=self._processNotifications)
-        self.subscriptions['scripthash'].start()
-
     # New method for subscribing to a scripthash and listening for updates
     def subscribeBlockHeaders(self):
         """
@@ -332,11 +326,6 @@ class ElectrumxAPI():
         initial_status_header = self._sendSubscriptionRequest(
             'blockchain.headers.subscribe', False, True)
         print(f"Initial status for header: {initial_status_header}")
-
-        # Start a thread to listen for updates
-        self.subscriptions['block'] = Thread(
-            target=self._processNotifications)
-        self.subscriptions['block'].start()
 
     # _processNotifications method to listening for updates
     def _processNotifications(self):
@@ -390,7 +379,7 @@ class ElectrumxAPI():
         if self.subscriptions['scripthash'] and self.subscriptions['scripthash'].is_alive():
             # Unsubscribe from the scripthash
             try:
-                self._sendRequest(
+                self._sendSubscriptionRequest(
                     'blockchain.scripthash.unsubscribe', True, self.scripthash)
                 print(
                     f"Unsubscribed from scripthash {self.scripthash}")
@@ -415,7 +404,8 @@ class ElectrumxAPI():
         if self.subscriptions['block'] and self.subscriptions['block'].is_alive():
             # Unsubscribe from the header subscription
             try:
-                self._sendRequest('blockchain.headers.unsubscribe', True)
+                self._sendSubscriptionRequest(
+                    'blockchain.headers.unsubscribe', True)
                 print("Unsubscribed from headers")
             except Exception as e:
                 print(f"Error while unsubscribing from headers: {str(e)}")

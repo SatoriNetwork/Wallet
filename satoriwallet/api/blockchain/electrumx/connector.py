@@ -5,7 +5,14 @@ import select
 
 
 class Connector:
-    def __init__(self, host, port, ssl=False, timeout=10*60, network='mainnet'):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        ssl: bool = False,
+        timeout: int = 10*60,
+        network: str = 'mainnet'
+    ):
         # self.log.log(15, "Starting...")
         self.host = host
         self.port = port
@@ -13,6 +20,7 @@ class Connector:
         self.timeout = timeout
         self.network = network
         self.connection: socket.socket = None
+        self.connection_subscriptions: socket.socket = None
         print(f'{self.host}:{self.port}', self.network)
         self.connect()
 
@@ -42,6 +50,11 @@ class Connector:
         #    return False
 
     def connect(self):
+        self.disconnect()
+        self.connect_connection()
+        self.connect_subscriptions()
+
+    def connect_connection(self):
         # self.log.log(10, "_connect {} {}".format(self.host, self.port))
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connection.settimeout(self.timeout)
@@ -72,5 +85,24 @@ class Connector:
                 f'error connecting to {self.host}:{str(self.port)} {e}')
             raise e
 
+    def connect_subscriptions(self):
+        self.connection_subscriptions = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM)
+        self.connection_subscriptions.settimeout(self.timeout)
+        if self.ssl:
+            context = ssl._create_unverified_context()
+            self.connection_subscriptions = context.wrap_socket(
+                self.connection_subscriptions, server_hostname=self.host)
+        try:
+            self.connection_subscriptions.connect((self.host, self.port))
+        except Exception as e:
+            logging.error(
+                f'error connecting to {self.host}:{str(self.port)} {e}')
+            raise e
+
     def disconnect(self):
-        self.connection.close()
+        try:
+            self.connection.close()
+            self.connection_subscriptions.close()
+        except Exception as _:
+            pass

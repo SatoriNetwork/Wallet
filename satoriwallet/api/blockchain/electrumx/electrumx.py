@@ -74,6 +74,40 @@ class Electrumx(Connector):
             self.connection.settimeout(None)
         return None
 
+    def _receive_subscriptions(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
+        if timeout is not None:
+            self.connection_subscriptions.settimeout(timeout)
+        buffer = ''
+        try:
+            while True:
+                try:
+                    raw = self.connection_subscriptions.recv(
+                        1024 * 16).decode('utf-8')
+                    buffer += raw
+                    if '\n' in raw:
+                        # Split on the first newline to handle multiple messages
+                        message, _, buffer = buffer.partition('\n')
+                        try:
+                            r = json.loads(message)
+                            self.log.log(5, "_receive {}".format(r))
+                            return r  # Return the parsed JSON object
+                        except json.decoder.JSONDecodeError as e:
+                            # Log the error and the problematic message part
+                            self.log.error(
+                                "JSONDecodeError: {} in message: {}".format(e, message))
+                            # Optionally continue or break depending on the scenario
+                            break
+                except socket.timeout:
+                    self.log.warning("Socket timeout occurred during receive.")
+                    return None  # Timeout, no message received
+                except Exception as e:
+                    self.log.error(f"Socket error during receive: {str(e)}")
+                    return None
+        finally:
+            # Reset the timeout to blocking mode
+            self.connection_subscriptions.settimeout(None)
+        return None
+
     def send(self, method, *args, **kwargs):
         payload = json.dumps(
             {
@@ -99,7 +133,7 @@ class Electrumx(Connector):
         ) + '\n'
         payload = payload.encode()
         self.log.log(5, "send {} {}".format(method, args))
-        self.connection.send(payload)
+        self.connection_subscriptions.send(payload)
 
     def receive_notifications(self):
         """
@@ -107,7 +141,7 @@ class Electrumx(Connector):
         """
         while True:
             try:
-                update = self._receive()
+                update = self._receive_subscriptions()
                 print('update', update)
                 if update and 'method' in update:
                     if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe']:
