@@ -5,14 +5,18 @@ from satoriwallet.lib.ethereum.valid_eth import isValidEthereumAddress
 
 class TransactionStruct():
 
-    def __init__(self, raw, vinVoutsTxs):
+    def __init__(self, raw: dict, vinVoutsTxs: list[dict]):
         self.raw = raw
+        self.vinVoutsTxs = vinVoutsTxs
         self.txid = self.getTxid(raw)
         self.height = self.getHeight(raw)
         self.confirmations = self.getConfirmations(raw)
         self.sent = self.getSent(raw)
         self.received = self.getReceived(raw, vinVoutsTxs)
         self.memo = self.getMemo(raw)
+
+    def export(self) -> tuple[dict, list[dict]]:
+        return self.raw, self.vinVoutsTxs
 
     def getTxid(self, raw):
         return raw.get('txid', 'unknown txid')

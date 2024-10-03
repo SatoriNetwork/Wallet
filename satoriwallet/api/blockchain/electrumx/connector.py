@@ -119,3 +119,7 @@ class Connector:
             self.connection_subscriptions.close()
         except Exception as _:
             pass
+        try:
+            self.connection_subscriptions.close()
+        except Exception as _:
+            pass
