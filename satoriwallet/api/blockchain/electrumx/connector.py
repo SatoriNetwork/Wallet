@@ -54,6 +54,19 @@ class Connector:
         self.connect_connection()
         self.connect_subscriptions()
 
+    def reconnect(self):
+        try:
+            # Check if the socket is still connected
+            print("reconnection")
+            self.connection.send(b'')  # Sending a no-op to check connection
+            self.connection_subscriptions.send(b'')
+            return True
+        except (socket.error, OSError):
+            # Attempt to reconnect if the connection is lost
+            print("Connection lost, attempting to reconnect...")
+            self.connect()  # Reconnect
+            return False  # Return False if reconnection fails
+
     def connect_connection(self):
         # self.log.log(10, "_connect {} {}".format(self.host, self.port))
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

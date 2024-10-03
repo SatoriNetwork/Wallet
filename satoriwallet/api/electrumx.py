@@ -324,7 +324,7 @@ class ElectrumxAPI():
 
         # Subscribe to the headers for new block
         initial_status_header = self._sendSubscriptionRequest(
-            'blockchain.headers.subscribe', False, True)
+            'blockchain.headers.subscribe', False)
         print(f"Initial status for header: {initial_status_header}")
 
     # _processNotifications method to listening for updates
