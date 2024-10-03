@@ -168,7 +168,8 @@ class ElectrumxAPI():
             if not self.handshake():
                 raise Exception("Handshake failed")
         try:
-            self.conn.sendSubscription(method, *params)
+            response = self.conn.sendSubscription(method, *params)
+            return ElectrumxAPI.interpret(response)
         except socket.timeout as e:
             print(f"Timeout during {method}: {str(e)}")
             raise
@@ -324,7 +325,7 @@ class ElectrumxAPI():
 
         # Subscribe to the headers for new block
         initial_status_header = self._sendSubscriptionRequest(
-            'blockchain.headers.subscribe', False, True)
+            'blockchain.headers.subscribe', False)
         print(f"Initial status for header: {initial_status_header}")
 
     # _processNotifications method to listening for updates
