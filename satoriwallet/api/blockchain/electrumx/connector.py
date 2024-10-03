@@ -55,6 +55,10 @@ class Connector:
         self.connect_subscriptions()
 
     def reconnect(self):
+        '''
+        doesn't work. doesn't detect connection loss, and self.connect()
+        doesn't solve connection loss
+        '''
         try:
             # Check if the socket is still connected
             print("reconnection")
