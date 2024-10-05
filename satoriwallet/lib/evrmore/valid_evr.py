@@ -28,6 +28,8 @@ def base58_check_decode(address):
 
 def isValidEvrmoreAddress(address):
     ''' Validate Evrmore address using Base58Check. '''
+    if not isValidEvrmoreAddressBasic(address):
+        return False
     is_valid, version = base58_check_decode(address)
     if not is_valid:
         return False
