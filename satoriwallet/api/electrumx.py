@@ -90,7 +90,7 @@ class ElectrumxAPI():
                 self.conn.connect()
                 if self.connected():
                     self.handshake()
-                    self.makeSubscriptions()
+                    # self.makeSubscriptions()
             except Exception as _:
                 time.sleep(1)
 

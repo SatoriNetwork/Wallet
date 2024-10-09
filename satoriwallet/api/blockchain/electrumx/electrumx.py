@@ -75,7 +75,7 @@ class Electrumx(Connector):
         return None
 
     def _receive_subscriptions(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
-        # print(f"_receive_subscriptions started {self.connection_subscriptions}")
+        print(f"_receive_subscriptions started {self.connection_subscriptions}")
         if timeout is not None:
             self.connection_subscriptions.settimeout(timeout)
         buffer = ''
