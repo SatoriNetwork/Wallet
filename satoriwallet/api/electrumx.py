@@ -90,7 +90,7 @@ class ElectrumxAPI():
                 self.conn.connect()
                 if self.connected():
                     self.handshake()
-                    self.makeSubscriptions()
+                    # self.makeSubscriptions()
             except Exception as _:
                 time.sleep(1)
 
@@ -168,7 +168,8 @@ class ElectrumxAPI():
             if not self.handshake():
                 raise Exception("Handshake failed")
         try:
-            self.conn.sendSubscription(method, *params)
+            response = self.conn.sendSubscription(method, *params)
+            return ElectrumxAPI.interpret(response)
         except socket.timeout as e:
             print(f"Timeout during {method}: {str(e)}")
             raise
