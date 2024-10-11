@@ -17,7 +17,7 @@ def verify(
     message: Union[str, EvrmoreMessage],
     signature: Union[bytes, str],
     publicKey: str = None,
-    address: str = None
+    address: Union[str, None] = None
 ):
     ''' returns bool success '''
     return VerifyMessage(
