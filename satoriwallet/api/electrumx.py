@@ -1,6 +1,6 @@
 import random
 from typing import Union, Dict
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 import socket
 import time
 from satoriwallet.api.blockchain import Electrumx
@@ -16,7 +16,7 @@ class ElectrumxAPI():
         connection: Electrumx = None,
         type: str = 'wallet',
         timeout: int = 5,
-        retry_attempts: int = 3,
+        retryAttempts: int = 3,
         onScripthashNotification=None,
         onBlockNotification=None,
     ):
@@ -25,9 +25,9 @@ class ElectrumxAPI():
         self.scripthash = scripthash
         self.servers = servers
         self.timeout = timeout
-        self.retry_attempts = retry_attempts
+        self.retryAttempts = retryAttempts
         self.conn = connection
-        self.last_handshake = time.time()
+        self.lastHandshake = time.time()
         self.transactions = None
         self.subscriptions = {}
         self.stop_all_subscriptions = Event()
@@ -84,7 +84,7 @@ class ElectrumxAPI():
         if self.connected():
             return self.conn
         tries = 0
-        while tries <= self.retry_attempts:
+        while tries <= self.retryAttempts:
             tries += 1
             try:
                 self.conn.connect()
@@ -101,11 +101,11 @@ class ElectrumxAPI():
 
     def handshake(self) -> bool:
         self._ensureConnected()
-        if self.connected() and self.last_handshake != None and time.time() - self.last_handshake < 60*60:
+        if self.connected() and self.lastHandshake != None and time.time() - self.lastHandshake < 60*60:
             return True
         if not self.connected():
             raise Exception('unable to connect to electrumx servers')
-        for _ in range(self.retry_attempts):
+        for _ in range(self.retryAttempts):
             try:
                 name = f'Satori Node {self.address}'
                 assetApiVersion = '1.10'
@@ -117,7 +117,7 @@ class ElectrumxAPI():
                     handshake[0].startswith(f'Electrumx {self.chain}')
                     and handshake[1] == assetApiVersion
                 ):
-                    self.last_handshake = time.time()
+                    self.lastHandshake = time.time()
                     return True
             except Exception as e:
                 print(f'error in handshake {e}')
@@ -152,7 +152,6 @@ class ElectrumxAPI():
                 raise Exception("Handshake failed")
         try:
             response = self.conn.send(method, *params)
-            print(f"!!!!!!!!!!!!!!Response Got!!!!!!!!!!! {method}")
             return ElectrumxAPI.interpret(response)
         except socket.timeout as e:
             print(f"Timeout during {method}: {str(e)}")
