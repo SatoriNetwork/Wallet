@@ -28,7 +28,7 @@ class TransactionStruct():
         self.received = self.getReceived(self.raw, self.vinVoutsTxs)
 
     def export(self) -> tuple[dict, list[str]]:
-        return self.raw, self.vinVoutsTxids
+        return self.raw, self.vinVoutsTxids, self.vinVoutsTxs
 
     def getTxid(self, raw):
         return raw.get('txid', 'unknown txid')
