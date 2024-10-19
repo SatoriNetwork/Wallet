@@ -78,6 +78,9 @@ class ElectrumxAPI():
             port=int(hostPort.split(':')[1]),
             ssl=True)
 
+    def disconnect(self):
+        self.conn.disconnect()
+
     def connect(self):
         if len(self.servers) == 0:
             raise Exception("No servers available")

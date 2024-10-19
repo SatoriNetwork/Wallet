@@ -9,14 +9,20 @@ class Connector:
         self,
         host: str,
         port: int,
+        hostSubscription: str,
+        portSubscription: int,
         ssl: bool = False,
+        sslSubscription: bool = False,
         timeout: int = 10*60,
         network: str = 'mainnet'
     ):
         # self.log.log(15, "Starting...")
         self.host = host
         self.port = port
+        self.hostSubscription = hostSubscription
+        self.portSubscription = portSubscription
         self.ssl = port == 50002 or ssl
+        self.sslSubscription = portSubscription == 50002 or sslSubscription
         self.timeout = timeout
         self.network = network
         self.connection: socket.socket = None
@@ -106,21 +112,21 @@ class Connector:
         self.connectionSubscriptions = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
         self.connectionSubscriptions.settimeout(self.timeout)
-        if self.ssl:
+        if self.sslSubscription:
             context = ssl._create_unverified_context()
             self.connectionSubscriptions = context.wrap_socket(
-                self.connectionSubscriptions, server_hostname=self.host)
+                self.connectionSubscriptions, server_hostname=self.hostSubscription)
         try:
-            self.connectionSubscriptions.connect((self.host, self.port))
+            self.connectionSubscriptions.connect(
+                (self.hostSubscription, self.portSubscription))
         except Exception as e:
             logging.error(
-                f'error connecting to {self.host}:{str(self.port)} {e}')
+                f'error connecting to {self.hostSubscription}:{str(self.portSubscription)} {e}')
             raise e
 
     def disconnect(self):
         try:
             self.connection.close()
-            self.connectionSubscriptions.close()
         except Exception as _:
             pass
         try:
