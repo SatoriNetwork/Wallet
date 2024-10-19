@@ -1,9 +1,12 @@
+import logging
 import random
 from typing import Union, Dict
 from threading import Thread, Event, Lock
 import socket
 import time
 from satoriwallet.api.blockchain import Electrumx
+
+logging.basicConfig(level=logging.INFO)
 
 
 class ElectrumxAPI():
@@ -123,9 +126,9 @@ class ElectrumxAPI():
                     self.lastHandshake = time.time()
                     return True
             except Exception as e:
-                print(f'error in handshake {e}')
+                logging.error(f'error in handshake {e}')
                 continue
-        print("Handshake failed after multiple attempts")
+        logging.error("Handshake failed after multiple attempts")
         self.conn.disconnect()
         return False
 
@@ -157,10 +160,10 @@ class ElectrumxAPI():
             response = self.conn.send(method, *params)
             return ElectrumxAPI.interpret(response)
         except socket.timeout as e:
-            print(f"Timeout during {method}: {str(e)}")
+            logging.error(f"Timeout during {method}: {str(e)}")
             raise
         except Exception as e:
-            print(f"Error during {method}: {str(e)}")
+            logging.error(f"Error during {method}: {str(e)}")
             raise
 
     def _sendSubscriptionRequest(self, method: str, checkConnection=True, *params):
@@ -173,10 +176,10 @@ class ElectrumxAPI():
             response = self.conn.sendSubscription(method, *params)
             return ElectrumxAPI.interpret(response)
         except socket.timeout as e:
-            print(f"Timeout during {method}: {str(e)}")
+            logging.error(f"Timeout during {method}: {str(e)}")
             raise
         except Exception as e:
-            print(f"Error during {method}: {str(e)}")
+            logging.error(f"Error during {method}: {str(e)}")
             raise
 
     def getCurrency(self):
@@ -190,7 +193,7 @@ class ElectrumxAPI():
         try:
             return self._sendRequest('server.banner', False)
         except Exception as e:
-            print(f"Error getting banner: {str(e)}")
+            logging.error(f"Error getting banner: {str(e)}")
             return "timeout error - unable to get banner"
 
     def getTransactionHistory(self):
@@ -200,7 +203,7 @@ class ElectrumxAPI():
             return self._sendRequest(
                 'blockchain.scripthash.get_history', False, self.scripthash)
         except Exception as e:
-            print(f"Error getting transaction history: {str(e)}")
+            logging.error(f"Error getting transaction history: {str(e)}")
             return []
 
     def getUnspentCurrency(self):
@@ -287,7 +290,6 @@ class ElectrumxAPI():
             self.stop_all_subscriptions.set()
             self.stopScripthashSubscription()
             self.stopHeaderSubscription()
-        print("Starting the Subscriptions")
         self.stop_all_subscriptions.clear()
         self.subscribeScriptHash()
         if self.type == 'vault':
@@ -300,16 +302,13 @@ class ElectrumxAPI():
         """
         if not self.connected():
             raise Exception("Not connected to Electrumx server.")
-
         # Ensure the connection is established and handshake is performed
-        print("subscribeScriptHash started")
         if not self.handshake():
             raise Exception("Not connected to Electrumx server.")
-
         # Subscribe to the scripthash
         initial_status = self._sendSubscriptionRequest(
             'blockchain.scripthash.subscribe', False, self.scripthash)
-        print(
+        logging.debug(
             f"Initial status for scripthash {self.scripthash}: {initial_status}")
 
     # New method for subscribing to a scripthash and listening for updates
@@ -319,55 +318,49 @@ class ElectrumxAPI():
         """
         if not self.connected():
             raise Exception("Not connected to Electrumx server.")
-
         # Ensure the connection is established and handshake is performed
-        print("subscribeBlockHeaders started")
         if not self.handshake():
             raise Exception("Not connected to Electrumx server.")
-
         # Subscribe to the headers for new block
         initial_status_header = self._sendSubscriptionRequest(
             'blockchain.headers.subscribe', False)
-        print(f"Initial status for header: {initial_status_header}")
+        logging.debug(f"Initial status for header: {initial_status_header}")
 
     # _processNotifications method to listening for updates
     def _processNotifications(self):
         """
         Processes incoming notifications for the subscribed scripthash and headers.
         """
-        print("_processNotifications started")
-
+        logging.debug("_processNotifications started")
         try:
             for notification in self.conn.receive_notifications():
-                print(f"Received notification {notification}")
+                logging.debug(f"Received notification {notification}")
                 if self.stop_all_subscriptions.is_set():
-                    print("Stop event set, breaking loop")
+                    logging.debug("Stop event set, breaking loop")
                     break
-
                 if 'method' in notification:
                     if notification['method'] == 'blockchain.scripthash.subscribe':
                         if 'params' in notification and len(notification['params']) == 2:
                             scripthash, status = notification['params']
                             if self.scripthash == scripthash:
-                                print(
+                                logging.debug(
                                     f"Received update for scripthash {scripthash}: {status}")
                                 if callable(self.onScripthashNotification):
                                     self.onScripthashNotification(notification)
                     elif notification['method'] == 'blockchain.headers.subscribe':
                         if 'params' in notification and len(notification['params']) > 0:
                             header = notification['params'][0]
-                            print(
+                            logging.debug(
                                 f"Received new block header: height {header.get('height')}, hash {header.get('hex')[:64]}")
                             self.lastBlockTime = time.time()
                             if callable(self.onBlockNotification):
                                 self.onBlockNotification(notification)
                     else:
-                        print(
+                        logging.error(
                             f"Received unknown method: {notification['method']}")
         except Exception as e:
-            print(f"Error in _processNotifications: {str(e)}")
-
-        print("_processNotifications ended")
+            logging.error(f"Error in _processNotifications: {str(e)}")
+        logging.debug("_processNotifications ended")
 
     # Method to stop subscription
     # unsubscribe from the Electrumx server
@@ -376,22 +369,20 @@ class ElectrumxAPI():
         """
         Stops the subscription thread.
         """
-        print(
+        logging.debug(
             f"Stop scripthash subscription started {self.subscriptions['scripthash']}")
-
         if self.subscriptions['scripthash'] and self.subscriptions['scripthash'].is_alive():
             # Unsubscribe from the scripthash
             try:
                 self._sendSubscriptionRequest(
                     'blockchain.scripthash.unsubscribe', True, self.scripthash)
-                print(
+                logging.debug(
                     f"Unsubscribed from scripthash {self.scripthash}")
             except Exception as e:
-                print(
+                logging.error(
                     f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
-
             self.subscriptions['scripthash'].join()
-            print(
+            logging.debug(
                 f"Stopped subscription thread for scripthash {self.scripthash}")
 
     # Method to stop subscription
@@ -401,18 +392,15 @@ class ElectrumxAPI():
         """
         Stops the subscription thread.
         """
-        print(
+        logging.debug(
             f"Stop header subscription started {self.subscriptions['block']}")
-
         if self.subscriptions['block'] and self.subscriptions['block'].is_alive():
             # Unsubscribe from the header subscription
             try:
                 self._sendSubscriptionRequest(
                     'blockchain.headers.unsubscribe', True)
-                print("Unsubscribed from headers")
+                logging.debug("Unsubscribed from headers")
             except Exception as e:
-                print(f"Error while unsubscribing from headers: {str(e)}")
-
+                logging.error(f"Error while unsubscribing from headers: {str(e)}")
             self.subscriptions['block'].join()
-            print(
-                f"Stopped header subscription thread")
+            logging.debug("Stopped header subscription thread")

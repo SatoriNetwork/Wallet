@@ -6,6 +6,7 @@ import time
 import threading
 from satoriwallet.api.blockchain.electrumx.connector import Connector
 
+logging.basicConfig(level=logging.INFO)
 
 class Electrumx(Connector):
     def __init__(self, *args, **kwargs):
@@ -34,7 +35,7 @@ class Electrumx(Connector):
         try:
             name = f'Satori Node {time.time()}'
             assetApiVersion = '1.10'
-            print(f'handshake {name} {assetApiVersion}')
+            logging.debug(f'handshake {name} {assetApiVersion}')
             self.handshaked = self.send(
                 'server.version',
                 name,
@@ -42,7 +43,7 @@ class Electrumx(Connector):
             self.lastHandshake = time.time()
             return True
         except Exception as e:
-            print(f'error in handshake initial {e}')
+            logging.error(f'error in handshake initial {e}')
 
     def _receive(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
         if timeout is not None:
@@ -78,7 +79,7 @@ class Electrumx(Connector):
         return None
 
     def _receiveSubscriptions(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
-        print(
+        logging.debug(
             f"_receiveSubscriptions started {self.connectionSubscriptions}")
         if timeout is not None:
             self.connectionSubscriptions.settimeout(timeout)
@@ -150,15 +151,15 @@ class Electrumx(Connector):
         while True:
             try:
                 update = self._receiveSubscriptions()
-                print('update', update)
+                logging.debug(f'update: {update}')
                 if update and 'method' in update:
                     if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe']:
                         yield update
                     else:
-                        print(f"Received unknown method: {update['method']}")
+                        logging.debug(f"Received unknown method: {update['method']}")
                 elif update is None:
-                    print("Received None update, breaking loop")
+                    logging.debug("Received None update, breaking loop")
                     # break  # Handle the case where the connection might have dropped
             except Exception as e:
-                print(f"Error in receive_notifications: {str(e)}")
+                logging.error(f"Error in receive_notifications: {str(e)}")
                 break

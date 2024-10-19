@@ -3,6 +3,8 @@ import ssl
 import logging
 import select
 
+logging.basicConfig(level=logging.INFO)
+
 
 class Connector:
     def __init__(
@@ -27,7 +29,7 @@ class Connector:
         self.network = network
         self.connection: socket.socket = None
         self.connectionSubscriptions: socket.socket = None
-        print(f'{self.host}:{self.port}', self.network)
+        logging.debug(f'{self.host}:{self.port} {self.network}')
         self.connect()
 
     def connected(self) -> bool:
@@ -67,13 +69,13 @@ class Connector:
         '''
         try:
             # Check if the socket is still connected
-            print("reconnection")
+            logging.debug("reconnection")
             self.connection.send(b'')  # Sending a no-op to check connection
             self.connectionSubscriptions.send(b'')
             return True
         except (socket.error, OSError):
             # Attempt to reconnect if the connection is lost
-            print("Connection lost, attempting to reconnect...")
+            logging.error("Connection lost, attempting to reconnect...")
             self.connect()  # Reconnect
             return False  # Return False if reconnection fails
 
