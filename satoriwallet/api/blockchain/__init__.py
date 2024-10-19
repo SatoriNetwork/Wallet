@@ -1,1 +1,1 @@
-from .electrumx.electrumx import ElectrumX
+from .electrumx.electrumx import Electrumx
