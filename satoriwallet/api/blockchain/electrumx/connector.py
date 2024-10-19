@@ -3,25 +3,33 @@ import ssl
 import logging
 import select
 
+logging.basicConfig(level=logging.INFO)
+
 
 class Connector:
     def __init__(
         self,
         host: str,
         port: int,
+        hostSubscription: str,
+        portSubscription: int,
         ssl: bool = False,
+        sslSubscription: bool = False,
         timeout: int = 10*60,
         network: str = 'mainnet'
     ):
         # self.log.log(15, "Starting...")
         self.host = host
         self.port = port
+        self.hostSubscription = hostSubscription
+        self.portSubscription = portSubscription
         self.ssl = port == 50002 or ssl
+        self.sslSubscription = portSubscription == 50002 or sslSubscription
         self.timeout = timeout
         self.network = network
         self.connection: socket.socket = None
-        self.connection_subscriptions: socket.socket = None
-        print(f'{self.host}:{self.port}', self.network)
+        self.connectionSubscriptions: socket.socket = None
+        logging.debug(f'{self.host}:{self.port} {self.network}')
         self.connect()
 
     def connected(self) -> bool:
@@ -51,21 +59,8 @@ class Connector:
 
     def connect(self):
         self.disconnect()
-        self.connect_connection()
-        self.connect_subscriptions()
-        
-    def reconnect(self):
-        try:
-            # Check if the socket is still connected
-            print("reconnection")
-            self.connection.send(b'')  # Sending a no-op to check connection
-            self.connection_subscriptions.send(b'')
-            return True
-        except (socket.error, OSError):
-            # Attempt to reconnect if the connection is lost
-            print("Connection lost, attempting to reconnect...")
-            self.connect()  # Reconnect
-            return False  # Return False if reconnection fails
+        self.connectConnection()
+        self.connectSubscriptions()
 
     def reconnect(self):
         '''
@@ -74,17 +69,17 @@ class Connector:
         '''
         try:
             # Check if the socket is still connected
-            print("reconnection")
+            logging.debug("reconnection")
             self.connection.send(b'')  # Sending a no-op to check connection
-            self.connection_subscriptions.send(b'')
+            self.connectionSubscriptions.send(b'')
             return True
         except (socket.error, OSError):
             # Attempt to reconnect if the connection is lost
-            print("Connection lost, attempting to reconnect...")
+            logging.error("Connection lost, attempting to reconnect...")
             self.connect()  # Reconnect
             return False  # Return False if reconnection fails
 
-    def connect_connection(self):
+    def connectConnection(self):
         # self.log.log(10, "_connect {} {}".format(self.host, self.port))
         self.connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connection.settimeout(self.timeout)
@@ -115,28 +110,28 @@ class Connector:
                 f'error connecting to {self.host}:{str(self.port)} {e}')
             raise e
 
-    def connect_subscriptions(self):
-        self.connection_subscriptions = socket.socket(
+    def connectSubscriptions(self):
+        self.connectionSubscriptions = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
-        self.connection_subscriptions.settimeout(self.timeout)
-        if self.ssl:
+        self.connectionSubscriptions.settimeout(self.timeout)
+        if self.sslSubscription:
             context = ssl._create_unverified_context()
-            self.connection_subscriptions = context.wrap_socket(
-                self.connection_subscriptions, server_hostname=self.host)
+            self.connectionSubscriptions = context.wrap_socket(
+                self.connectionSubscriptions, server_hostname=self.hostSubscription)
         try:
-            self.connection_subscriptions.connect((self.host, self.port))
+            self.connectionSubscriptions.connect(
+                (self.hostSubscription, self.portSubscription))
         except Exception as e:
             logging.error(
-                f'error connecting to {self.host}:{str(self.port)} {e}')
+                f'error connecting to {self.hostSubscription}:{str(self.portSubscription)} {e}')
             raise e
 
     def disconnect(self):
         try:
             self.connection.close()
-            self.connection_subscriptions.close()
         except Exception as _:
             pass
         try:
-            self.connection_subscriptions.close()
+            self.connectionSubscriptions.close()
         except Exception as _:
             pass

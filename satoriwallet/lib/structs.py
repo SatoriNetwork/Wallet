@@ -5,18 +5,30 @@ from satoriwallet.lib.ethereum.valid_eth import isValidEthereumAddress
 
 class TransactionStruct():
 
-    def __init__(self, raw: dict, vinVoutsTxs: list[dict]):
+    def __init__(self, raw: dict, vinVoutsTxids: list[str], vinVoutsTxs: list[dict] = None):
         self.raw = raw
-        self.vinVoutsTxs = vinVoutsTxs
+        self.vinVoutsTxids = vinVoutsTxids
+        self.vinVoutsTxs: list[dict] = vinVoutsTxs or []
         self.txid = self.getTxid(raw)
         self.height = self.getHeight(raw)
         self.confirmations = self.getConfirmations(raw)
         self.sent = self.getSent(raw)
-        self.received = self.getReceived(raw, vinVoutsTxs)
         self.memo = self.getMemo(raw)
 
-    def export(self) -> tuple[dict, list[dict]]:
-        return self.raw, self.vinVoutsTxs
+    def getSupportingTransactions(self, electrumx: 'ElectrumxAPI'):
+        txs = []
+        for vin in self.raw.get('vin', []):
+            txs.append(
+                electrumx.getTransaction(vin.get('txid', '')))
+        self.vinVoutsTxs: list[dict] = [t for t in txs if t is not None]
+
+    def getAndSetReceived(self, electrumx: 'ElectrumxAPI' = None):
+        if len(self.vinVoutsTxs) > 0 and electrumx:
+            self.getSupportingTransactions(electrumx)
+        self.received = self.getReceived(self.raw, self.vinVoutsTxs)
+
+    def export(self) -> tuple[dict, list[str]]:
+        return self.raw, self.vinVoutsTxids, self.vinVoutsTxs
 
     def getTxid(self, raw):
         return raw.get('txid', 'unknown txid')

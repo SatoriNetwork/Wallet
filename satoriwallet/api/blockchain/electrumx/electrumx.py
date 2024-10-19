@@ -3,14 +3,18 @@ import logging
 import socket
 import json
 import time
-from .connector import Connector
+import threading
+from satoriwallet.api.blockchain.electrumx.connector import Connector
 
+logging.basicConfig(level=logging.INFO)
 
 class Electrumx(Connector):
     def __init__(self, *args, **kwargs):
         self.log = logging.getLogger(type(self).__name__)
         super(type(self), self).__init__(*args, **kwargs)
-        self.last_handshake = 0
+        self.lock = threading.Lock()  # Lock for general connection
+        self.subscriptionLock = threading.Lock()  # Lock for subscriptions
+        self.lastHandshake = 0
         self.handshaked = None
         self.handshake()
 
@@ -31,15 +35,15 @@ class Electrumx(Connector):
         try:
             name = f'Satori Node {time.time()}'
             assetApiVersion = '1.10'
-            print(f'handshake {name} {assetApiVersion}')
+            logging.debug(f'handshake {name} {assetApiVersion}')
             self.handshaked = self.send(
                 'server.version',
                 name,
                 assetApiVersion)
-            self.last_handshake = time.time()
+            self.lastHandshake = time.time()
             return True
         except Exception as e:
-            print(f'error in handshake initial {e}')
+            logging.error(f'error in handshake initial {e}')
 
     def _receive(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
         if timeout is not None:
@@ -60,7 +64,7 @@ class Electrumx(Connector):
                         except json.decoder.JSONDecodeError as e:
                             # Log the error and the problematic message part
                             self.log.error(
-                                "JSONDecodeError: {} in message: {}".format(e, message))
+                                "JSONDecodeError: {} in message: {} error in _receive".format(e, message))
                             # Optionally continue or break depending on the scenario
                             break
                 except socket.timeout:
@@ -74,15 +78,16 @@ class Electrumx(Connector):
             self.connection.settimeout(None)
         return None
 
-    def _receive_subscriptions(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
-        print(f"_receive_subscriptions started {self.connection_subscriptions}")
+    def _receiveSubscriptions(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
+        logging.debug(
+            f"_receiveSubscriptions started {self.connectionSubscriptions}")
         if timeout is not None:
-            self.connection_subscriptions.settimeout(timeout)
+            self.connectionSubscriptions.settimeout(timeout)
         buffer = ''
         try:
             while True:
                 try:
-                    raw = self.connection_subscriptions.recv(
+                    raw = self.connectionSubscriptions.recv(
                         1024 * 16).decode('utf-8')
                     buffer += raw
                     if '\n' in raw:
@@ -95,7 +100,7 @@ class Electrumx(Connector):
                         except json.decoder.JSONDecodeError as e:
                             # Log the error and the problematic message part
                             self.log.error(
-                                "JSONDecodeError: {} in message: {}".format(e, message))
+                                "JSONDecodeError: {} in message: {} error in _receiveSubscriptions".format(e, message))
                             # Optionally continue or break depending on the scenario
                             break
                 except socket.timeout:
@@ -106,7 +111,7 @@ class Electrumx(Connector):
                     return None
         finally:
             # Reset the timeout to blocking mode
-            self.connection_subscriptions.settimeout(None)
+            self.connectionSubscriptions.settimeout(None)
         return None
 
     def send(self, method, *args, **kwargs):
@@ -120,8 +125,9 @@ class Electrumx(Connector):
         ) + '\n'
         payload = payload.encode()
         self.log.log(5, "send {} {}".format(method, args))
-        self.connection.send(payload)
-        return self._receive()
+        with self.lock:
+            self.connection.send(payload)
+            return self._receive()
 
     def sendSubscription(self, method, *args, **kwargs):
         payload = json.dumps(
@@ -134,8 +140,9 @@ class Electrumx(Connector):
         ) + '\n'
         payload = payload.encode()
         self.log.log(5, "send {} {}".format(method, args))
-        self.connection_subscriptions.send(payload)
-        return self._receive_subscriptions()
+        with self.subscriptionLock:
+            self.connectionSubscriptions.send(payload)
+            return self._receiveSubscriptions()
 
     def receive_notifications(self):
         """
@@ -143,16 +150,16 @@ class Electrumx(Connector):
         """
         while True:
             try:
-                update = self._receive_subscriptions()
-                print('update', update)
+                update = self._receiveSubscriptions()
+                logging.debug(f'update: {update}')
                 if update and 'method' in update:
                     if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe']:
                         yield update
                     else:
-                        print(f"Received unknown method: {update['method']}")
+                        logging.debug(f"Received unknown method: {update['method']}")
                 elif update is None:
-                    print("Received None update, breaking loop")
+                    logging.debug("Received None update, breaking loop")
                     # break  # Handle the case where the connection might have dropped
             except Exception as e:
-                print(f"Error in receive_notifications: {str(e)}")
+                logging.error(f"Error in receive_notifications: {str(e)}")
                 break
