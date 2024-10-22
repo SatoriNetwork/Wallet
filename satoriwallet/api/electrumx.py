@@ -270,7 +270,7 @@ class ElectrumxAPI():
                 'blockchain.asset.list_addresses_by_asset', False, 'SATORI', False, 1000, i)
             if target_address is not None and target_address in response.keys():
                 return {target_address: response[target_address]}
-            addresses.update(response)
+            addresses = {**addresses, **response}
             if len(response) < 1000:
                 break
             i += 1000
@@ -401,6 +401,7 @@ class ElectrumxAPI():
                     'blockchain.headers.unsubscribe', True)
                 logging.debug("Unsubscribed from headers")
             except Exception as e:
-                logging.error(f"Error while unsubscribing from headers: {str(e)}")
+                logging.error(
+                    f"Error while unsubscribing from headers: {str(e)}")
             self.subscriptions['block'].join()
             logging.debug("Stopped header subscription thread")
