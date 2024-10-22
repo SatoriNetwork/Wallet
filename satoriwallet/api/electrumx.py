@@ -32,7 +32,6 @@ class ElectrumxAPI():
         self.conn = connection
         self.lastHandshake = time.time()
         self.transactions = None
-        self.subscriptions = {}
         self.stop_all_subscriptions = Event()
         self.balance = None
         self.stats = None
@@ -47,11 +46,13 @@ class ElectrumxAPI():
             self.conn = self.makeConnection()
 
     def connected(self):
-        if (
-            self.subscriptions.get('block') is not None and
-            self.lastBlockTime + 5*60 < time.time()
-        ):
-            return False
+        # if (
+        #    self.subscriptions.get('block') is not None and
+        #    self.lastBlockTime + 5*60 < time.time()
+        # ):
+        #    print('FALSE')
+        #    return False
+        print(self.conn is not None and self.conn.connected())
         return self.conn is not None and self.conn.connected()
 
     def makeConnection(self):
@@ -284,13 +285,13 @@ class ElectrumxAPI():
                 'blockchain.transaction.broadcast', True, raw_tx)
         return self.sentTx
 
+    def cancelSubscriptions(self):
+        self.stop_all_subscriptions.set()
+        self.stopScripthashSubscription()
+        self.stop_all_subscriptions.clear()
+
     # make all subscriptions - handles cleaning up stale subscriptions
     def makeSubscriptions(self):
-        if self.subscriptions.get('scripthash') != None or self.subscriptions.get('block') != None:
-            self.stop_all_subscriptions.set()
-            self.stopScripthashSubscription()
-            self.stopHeaderSubscription()
-        self.stop_all_subscriptions.clear()
         self.subscribeScriptHash()
         if self.type == 'vault':
             self.subscribeBlockHeaders()
@@ -307,7 +308,7 @@ class ElectrumxAPI():
             raise Exception("Not connected to Electrumx server.")
         # Subscribe to the scripthash
         initial_status = self._sendSubscriptionRequest(
-            'blockchain.scripthash.subscribe', False, self.scripthash)
+            'blockchain.scripthash.subscribe', False, [self.scripthash, '7abafd1deff66141718981e1853d1fa7a402859f75fdf9178d4ecf7a0a0350fe'])
         logging.debug(
             f"Initial status for scripthash {self.scripthash}: {initial_status}")
 
@@ -366,42 +367,12 @@ class ElectrumxAPI():
     # unsubscribe from the Electrumx server
     # Stop the event and thread
     def stopScripthashSubscription(self):
-        """
-        Stops the subscription thread.
-        """
-        logging.debug(
-            f"Stop scripthash subscription started {self.subscriptions['scripthash']}")
-        if self.subscriptions['scripthash'] and self.subscriptions['scripthash'].is_alive():
-            # Unsubscribe from the scripthash
-            try:
-                self._sendSubscriptionRequest(
-                    'blockchain.scripthash.unsubscribe', True, self.scripthash)
-                logging.debug(
-                    f"Unsubscribed from scripthash {self.scripthash}")
-            except Exception as e:
-                logging.error(
-                    f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
-            self.subscriptions['scripthash'].join()
+        ''' Stops the subscription thread. '''
+        try:
+            self._sendSubscriptionRequest(
+                'blockchain.scripthash.unsubscribe', True, self.scripthash)
             logging.debug(
-                f"Stopped subscription thread for scripthash {self.scripthash}")
-
-    # Method to stop subscription
-    # unsubscribe from the Electrumx server
-    # Stop the event and thread
-    def stopHeaderSubscription(self):
-        """
-        Stops the subscription thread.
-        """
-        logging.debug(
-            f"Stop header subscription started {self.subscriptions['block']}")
-        if self.subscriptions['block'] and self.subscriptions['block'].is_alive():
-            # Unsubscribe from the header subscription
-            try:
-                self._sendSubscriptionRequest(
-                    'blockchain.headers.unsubscribe', True)
-                logging.debug("Unsubscribed from headers")
-            except Exception as e:
-                logging.error(
-                    f"Error while unsubscribing from headers: {str(e)}")
-            self.subscriptions['block'].join()
-            logging.debug("Stopped header subscription thread")
+                f"Unsubscribed from scripthash {self.scripthash}")
+        except Exception as e:
+            logging.error(
+                f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")

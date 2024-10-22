@@ -6,7 +6,6 @@ import time
 import threading
 from satoriwallet.api.blockchain.electrumx.connector import Connector
 
-logging.basicConfig(level=logging.INFO)
 
 class Electrumx(Connector):
     def __init__(self, *args, **kwargs):
@@ -18,14 +17,19 @@ class Electrumx(Connector):
         self.handshaked = None
         self.handshake()
 
+    def connect(self) -> bool:
+        super().connect()
+        super().connectSubscriptions()
+
     def connected(self) -> bool:
         if self.connection is None:
             return False
         try:
-            # self.connection.settimeout(10)
+            # Test the connection by sending a lightweight request
+            self.send('server.ping')
             return True
         except Exception as e:
-            self.log.error(f"error setting timeout {e}")
+            self.log.error(f"Connection check failed: {e}")
             return False
         # if self.send('server.ping') == None:
         #    return False
@@ -79,8 +83,6 @@ class Electrumx(Connector):
         return None
 
     def _receiveSubscriptions(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
-        logging.debug(
-            f"_receiveSubscriptions started {self.connectionSubscriptions}")
         if timeout is not None:
             self.connectionSubscriptions.settimeout(timeout)
         buffer = ''
@@ -142,7 +144,8 @@ class Electrumx(Connector):
         self.log.log(5, "send {} {}".format(method, args))
         with self.subscriptionLock:
             self.connectionSubscriptions.send(payload)
-            return self._receiveSubscriptions()
+            # return self._receiveSubscriptions()
+        return f'subscribed to {payload}'
 
     def receive_notifications(self):
         """
@@ -151,12 +154,12 @@ class Electrumx(Connector):
         while True:
             try:
                 update = self._receiveSubscriptions()
-                logging.debug(f'update: {update}')
                 if update and 'method' in update:
-                    if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe']:
+                    if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe', 'blockchain.scripthash.unsubscribe']:
                         yield update
                     else:
-                        logging.debug(f"Received unknown method: {update['method']}")
+                        logging.debug(
+                            f"Received unknown method: {update['method']}")
                 elif update is None:
                     logging.debug("Received None update, breaking loop")
                     # break  # Handle the case where the connection might have dropped

@@ -60,6 +60,9 @@ class Connector:
     def connect(self):
         self.disconnect()
         self.connectConnection()
+
+    def connectSubscription(self):
+        self.disconnectSubscription()
         self.connectSubscriptions()
 
     def reconnect(self):
@@ -71,12 +74,27 @@ class Connector:
             # Check if the socket is still connected
             logging.debug("reconnection")
             self.connection.send(b'')  # Sending a no-op to check connection
-            self.connectionSubscriptions.send(b'')
             return True
         except (socket.error, OSError):
             # Attempt to reconnect if the connection is lost
             logging.error("Connection lost, attempting to reconnect...")
             self.connect()  # Reconnect
+            return False  # Return False if reconnection fails
+
+    def reconnectSubscription(self):
+        '''
+        doesn't work. doesn't detect connection loss, and self.connect()
+        doesn't solve connection loss
+        '''
+        try:
+            # Check if the socket is still connected
+            logging.debug("reconnection")
+            self.connectionSubscriptions.send(b'')
+            return True
+        except (socket.error, OSError):
+            # Attempt to reconnect if the connection is lost
+            logging.error("Connection lost, attempting to reconnect...")
+            self.connectSubscription()  # Reconnect
             return False  # Return False if reconnection fails
 
     def connectConnection(self):
@@ -131,6 +149,8 @@ class Connector:
             self.connection.close()
         except Exception as _:
             pass
+
+    def disconnectSubscription(self):
         try:
             self.connectionSubscriptions.close()
         except Exception as _:
