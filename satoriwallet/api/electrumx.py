@@ -32,7 +32,7 @@ class ElectrumxAPI():
         self.conn = connection
         self.lastHandshake = time.time()
         self.transactions = None
-        self.stop_all_subscriptions = Event()
+        self.stopAllSubscriptions = Event()
         self.balance = None
         self.stats = None
         self.banner = None
@@ -52,7 +52,6 @@ class ElectrumxAPI():
         # ):
         #    print('FALSE')
         #    return False
-        print(self.conn is not None and self.conn.connected())
         return self.conn is not None and self.conn.connected()
 
     def makeConnection(self):
@@ -174,7 +173,10 @@ class ElectrumxAPI():
             if not self.handshake():
                 raise Exception("Handshake failed")
         try:
-            response = self.conn.sendSubscription(method, *params)
+            if self.type == 'wallet':
+                response = self.conn.sendWalletSubscription(method, *params)
+            else:
+                response = self.conn.sendVaultSubscription(method, *params)
             return ElectrumxAPI.interpret(response)
         except socket.timeout as e:
             logging.error(f"Timeout during {method}: {str(e)}")
@@ -286,9 +288,9 @@ class ElectrumxAPI():
         return self.sentTx
 
     def cancelSubscriptions(self):
-        self.stop_all_subscriptions.set()
+        self.stopAllSubscriptions.set()
         self.stopScripthashSubscription()
-        self.stop_all_subscriptions.clear()
+        self.stopAllSubscriptions.clear()
 
     # make all subscriptions - handles cleaning up stale subscriptions
     def makeSubscriptions(self):
@@ -327,16 +329,19 @@ class ElectrumxAPI():
             'blockchain.headers.subscribe', False)
         logging.debug(f"Initial status for header: {initial_status_header}")
 
-    # _processNotifications method to listening for updates
-    def _processNotifications(self):
+    def processNotifications(self):
         """
         Processes incoming notifications for the subscribed scripthash and headers.
         """
         logging.debug("_processNotifications started")
         try:
-            for notification in self.conn.receive_notifications():
+            for notification in (
+                self.conn.receiveWalletNotifications()
+                if self.type == 'wallet'
+                else self.conn.receiveVaultNotifications()
+            ):
                 logging.debug(f"Received notification {notification}")
-                if self.stop_all_subscriptions.is_set():
+                if self.stopAllSubscriptions.is_set():
                     logging.debug("Stop event set, breaking loop")
                     break
                 if 'method' in notification:
