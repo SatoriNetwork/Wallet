@@ -301,14 +301,14 @@ class ElectrumxAPI():
         """
         Subscribe to the scripthash and start listening for updates.
         """
-        if not self.connected():
-            raise Exception("Not connected to Electrumx server.")
+        # if not self.connected():
+        #    raise Exception("Not connected to Electrumx server.")
         # Ensure the connection is established and handshake is performed
-        if not self.handshake():
-            raise Exception("Not connected to Electrumx server.")
+        # if not self.handshake():
+        #    raise Exception("Not connected to Electrumx server.")
         # Subscribe to the scripthash
         initial_status = self._sendSubscriptionRequest(
-            'blockchain.scripthash.subscribe', False, [self.scripthash, '7abafd1deff66141718981e1853d1fa7a402859f75fdf9178d4ecf7a0a0350fe'])
+            'blockchain.scripthash.subscribe', False, self.scripthash)
         logging.debug(
             f"Initial status for scripthash {self.scripthash}: {initial_status}")
 
@@ -317,11 +317,11 @@ class ElectrumxAPI():
         """
         Subscribe to the scripthash and start listening for updates.
         """
-        if not self.connected():
-            raise Exception("Not connected to Electrumx server.")
+        # if not self.connected():
+        #    raise Exception("Not connected to Electrumx server.")
         # Ensure the connection is established and handshake is performed
-        if not self.handshake():
-            raise Exception("Not connected to Electrumx server.")
+        # if not self.handshake():
+        #    raise Exception("Not connected to Electrumx server.")
         # Subscribe to the headers for new block
         initial_status_header = self._sendSubscriptionRequest(
             'blockchain.headers.subscribe', False)
@@ -370,7 +370,7 @@ class ElectrumxAPI():
         ''' Stops the subscription thread. '''
         try:
             self._sendSubscriptionRequest(
-                'blockchain.scripthash.unsubscribe', True, self.scripthash)
+                'blockchain.scripthash.unsubscribe', False, self.scripthash)
             logging.debug(
                 f"Unsubscribed from scripthash {self.scripthash}")
         except Exception as e:

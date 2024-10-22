@@ -57,6 +57,11 @@ class Connector:
         # except Exception as e:
         #    return False
 
+    def connectedSubscription(self) -> bool:
+        if self.connectionSubscriptions is None:
+            return False
+        return True
+
     def connect(self):
         self.disconnect()
         self.connectConnection()

@@ -45,6 +45,11 @@ class Electrumx(Connector):
                 name,
                 assetApiVersion)
             self.lastHandshake = time.time()
+            self.handshakedSubscription = self.sendSubscription(
+                'server.version',
+                name,
+                assetApiVersion)
+            self.lastHandshakeSubscription = time.time()
             return True
         except Exception as e:
             logging.error(f'error in handshake initial {e}')
@@ -154,6 +159,7 @@ class Electrumx(Connector):
         while True:
             try:
                 update = self._receiveSubscriptions()
+                logging.debug('update: {}'.format(update))
                 if update and 'method' in update:
                     if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe', 'blockchain.scripthash.unsubscribe']:
                         yield update
