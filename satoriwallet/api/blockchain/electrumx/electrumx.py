@@ -1,47 +1,188 @@
+from typing import Union
 import logging
+import socket
 import json
 import time
-from .connector import Connector
+import threading
+from satoriwallet.api.blockchain.electrumx.connector import Connector
 
 
-class ElectrumX(Connector):
+class Electrumx(Connector):
     def __init__(self, *args, **kwargs):
         self.log = logging.getLogger(type(self).__name__)
         super(type(self), self).__init__(*args, **kwargs)
+        self.lock = threading.Lock()  # Lock for general connection
+        self.walletSubscriptionLock = threading.Lock()  # Lock for subscriptions
+        self.vaultSubscriptionLock = threading.Lock()  # Lock for subscriptions
+        self.lastHandshake = 0
+        self.handshaked = None
+        self.handshake()
 
-    def _receive(self):
+    def connect(self) -> bool:
+        super().connect()
+        super().connectSubscriptions()
+
+    def connected(self) -> bool:
+        if self.connection is None:
+            return False
+        try:
+            # Test the connection by sending a lightweight request
+            self.send('server.ping')
+            return True
+        except Exception as e:
+            self.log.error(f"Connection check failed: {e}")
+            return False
+        # if self.send('server.ping') == None:
+        #    return False
+        # return True
+
+    def handshake(self):
+        try:
+            name = f'Satori Neuron {time.time()}'
+            assetApiVersion = '1.10'
+            logging.debug(f'handshake {name} {assetApiVersion}')
+            self.handshaked = self.send(
+                'server.version',
+                name,
+                assetApiVersion)
+            self.lastHandshake = time.time()
+            self.handshakedWalletSubscription = self.sendWalletSubscription(
+                'server.version',
+                f'Satori Wallet {time.time()}',
+                assetApiVersion)
+            self.handshakedVaultSubscription = self.sendVaultSubscription(
+                'server.version',
+                f'Satori Vault {time.time()}',
+                assetApiVersion)
+            self.lastHandshakeWalletSubscription = time.time()
+            self.lastHandshakeVaultSubscription = time.time()
+            return True
+        except Exception as e:
+            logging.error(f'error in handshake initial {e}')
+
+    def _receive(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
+        if timeout is not None:
+            self.connection.settimeout(timeout)
         buffer = ''
-        while True:
-            raw = self.connection.recv(1024*16).decode('utf-8')
-            buffer += raw
-            if '\n' in raw:
-                # Assuming messages are newline-terminated, split on the first newline.
-                # This is useful in case multiple messages are received or a message is exactly at the boundary.
-                message, _, buffer = buffer.partition('\n')
+        try:
+            while True:
                 try:
-                    r = json.loads(message)
-                    self.log.log(5, "_receive {}".format(r))
-                    return r  # Return the parsed JSON object
-                except json.decoder.JSONDecodeError as e:
-                    # Log the error and the problematic message part
-                    self.log.error(
-                        "JSONDecodeError: {} in message: {}".format(e, message))
-                    # Optionally, handle incomplete message scenarios by breaking or continuing
-                    # For now, let's break to avoid an infinite loop
-                    break
-            # Optionally, implement a mechanism to prevent an infinite loop if the server sends data that never includes a newline
-        return None  # or return an appropriate error/value
+                    raw = self.connection.recv(1024 * 16).decode('utf-8')
+                    buffer += raw
+                    if '\n' in raw:
+                        # Split on the first newline to handle multiple messages
+                        message, _, buffer = buffer.partition('\n')
+                        try:
+                            r = json.loads(message)
+                            self.log.log(5, "_receive {}".format(r))
+                            return r  # Return the parsed JSON object
+                        except json.decoder.JSONDecodeError as e:
+                            # Log the error and the problematic message part
+                            self.log.error(
+                                "JSONDecodeError: {} in message: {} error in _receive".format(e, message))
+                            # Optionally continue or break depending on the scenario
+                            break
+                except socket.timeout:
+                    self.log.warning("Socket timeout occurred during receive.")
+                    return None  # Timeout, no message received
+                except Exception as e:
+                    self.log.error(f"Socket error during receive: {str(e)}")
+                    return None
+        finally:
+            # Reset the timeout to blocking mode
+            self.connection.settimeout(None)
+        return None
 
-    def send(self, method, *args):
-        payload = json.dumps(
-            {
-                "jsonrpc": "2.0",
-                "id": int(time.time()*1000),
-                "method": method,
-                "params": args
-            }
-        ) + '\n'
+    def _receiveSubscriptions(self, conn: socket.socket, timeout: Union[int, None] = None) -> Union[dict, list, None]:
+        if timeout is not None:
+            conn.settimeout(timeout)
+        buffer = ''
+        try:
+            while True:
+                try:
+                    raw = conn.recv(
+                        1024 * 16).decode('utf-8')
+                    buffer += raw
+                    if '\n' in raw:
+                        # Split on the first newline to handle multiple messages
+                        message, _, buffer = buffer.partition('\n')
+                        try:
+                            r = json.loads(message)
+                            self.log.log(5, "_receive {}".format(r))
+                            return r  # Return the parsed JSON object
+                        except json.decoder.JSONDecodeError as e:
+                            # Log the error and the problematic message part
+                            self.log.error(
+                                "JSONDecodeError: {} in message: {} error in _receiveSubscriptions".format(e, message))
+                            # Optionally continue or break depending on the scenario
+                            break
+                except socket.timeout:
+                    self.log.warning("Socket timeout occurred during receive.")
+                    return None  # Timeout, no message received
+                except Exception as e:
+                    self.log.error(f"Socket error during receive: {str(e)}")
+                    return None
+        finally:
+            # Reset the timeout to blocking mode
+            conn.settimeout(None)
+        return None
+
+    def send(self, method, *args, **kwargs):
+        payload = json.dumps({
+            "jsonrpc": "2.0",
+            "id": int(time.time()*1000),
+            "method": method,
+            "params": args
+        }) + '\n'
         payload = payload.encode()
         self.log.log(5, "send {} {}".format(method, args))
-        self.connection.send(payload)
-        return self._receive()
+        with self.lock:
+            self.connection.send(payload)
+            return self._receive()
+
+    def sendSubscription(self, conn: socket.socket, method, *args, **kwargs):
+        payload = json.dumps({
+            "jsonrpc": "2.0",
+            "id": int(time.time()*1000),
+            "method": method,
+            "params": args
+        }) + '\n'
+        payload = payload.encode()
+        self.log.log(5, "send {} {}".format(method, args))
+        conn.send(payload)
+        return f'subscribed to {payload}'
+
+    def sendWalletSubscription(self, method, *args, **kwargs):
+        with self.walletSubscriptionLock:
+            return self.sendSubscription(self.connectionWalletSubscription, method, *args, **kwargs)
+
+    def sendVaultSubscription(self, method, *args, **kwargs):
+        with self.vaultSubscriptionLock:
+            return self.sendSubscription(self.connectionVaultSubscription, method, *args, **kwargs)
+
+    def receiveNotifications(self, conn: socket.socket):
+        """
+        Continuously listens for notifications from the server.
+        """
+        while True:
+            try:
+                update = self._receiveSubscriptions(conn)
+                logging.debug('update: {}'.format(update))
+                if update and 'method' in update:
+                    if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe', 'blockchain.scripthash.unsubscribe']:
+                        yield update
+                    else:
+                        logging.debug(
+                            f"Received unknown method: {update['method']}")
+                elif update is None:
+                    logging.debug("Received None update, breaking loop")
+                    # break  # Handle the case where the connection might have dropped
+            except Exception as e:
+                logging.error(f"Error in receiveNotifications: {str(e)}")
+                break
+
+    def receiveWalletNotifications(self):
+        return self.receiveNotifications(self.connectionWalletSubscription)
+
+    def receiveVaultNotifications(self):
+        return self.receiveNotifications(self.connectionVaultSubscription)
