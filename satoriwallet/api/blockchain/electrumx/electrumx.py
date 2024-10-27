@@ -27,7 +27,9 @@ class Electrumx(Connector):
             return False
         try:
             # Test the connection by sending a lightweight request
-            self.send('server.ping')
+            response = self.send('server.ping')
+            if response is None:
+                return False
             return True
         except Exception as e:
             self.log.error(f"Connection check failed: {e}")
@@ -69,6 +71,8 @@ class Electrumx(Connector):
                 try:
                     raw = self.connection.recv(1024 * 16).decode('utf-8')
                     buffer += raw
+                    if raw == '':
+                        return None
                     if '\n' in raw:
                         # Split on the first newline to handle multiple messages
                         message, _, buffer = buffer.partition('\n')
@@ -127,7 +131,7 @@ class Electrumx(Connector):
             conn.settimeout(None)
         return None
 
-    def send(self, method, *args, **kwargs):
+    def send(self, method: str, *args, **kwargs):
         payload = json.dumps({
             "jsonrpc": "2.0",
             "id": int(time.time()*1000),
@@ -138,7 +142,7 @@ class Electrumx(Connector):
         self.log.log(5, "send {} {}".format(method, args))
         with self.lock:
             self.connection.send(payload)
-            return self._receive()
+            return self._receive(timeout=kwargs.get('timeout'))
 
     def sendSubscription(self, conn: socket.socket, method, *args, **kwargs):
         payload = json.dumps({
