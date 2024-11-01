@@ -102,9 +102,9 @@ class ElectrumxAPI():
 
     # Ensure if the connection is established or not
     def _ensureConnected(self):
-        logging.debug('in _ensureConnected', color='magenta')
+        logging.debug('in _ensureConnected')
         if not self.connected():
-            logging.debug('in _ensureConnected', color='magenta')
+            logging.debug('in _ensureConnected')
             self.connect()
 
     def handshake(self) -> bool:
