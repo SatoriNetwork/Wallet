@@ -69,21 +69,13 @@ class Connector:
         return True
 
     def connect(self):
-        # should we fail if we fail to connect? probably at this layer...
-        # but we don't want the neuron to be dependant upon electrum to run...
-        try:
-            self.disconnect()
-            self.connectConnection()
-        except Exception as _:
-            pass
+        self.disconnect()
+        self.connectConnection()
 
     def connectSubscriptions(self):
-        try:
-            self.disconnectSubscriptions()
-            self.connectWalletSubscription()
-            self.connectVaultSubscription()
-        except Exception as _:
-            pass
+        self.disconnectSubscriptions()
+        self.connectWalletSubscription()
+        self.connectVaultSubscription()
 
     def reconnect(self):
         '''
