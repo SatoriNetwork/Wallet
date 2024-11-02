@@ -54,6 +54,15 @@ class ElectrumxAPI():
         #    return False
         return self.conn is not None and self.conn.connected()
 
+    def connectedSubscriptions(self):
+        # if (
+        #    self.subscriptions.get('block') is not None and
+        #    self.lastBlockTime + 5*60 < time.time()
+        # ):
+        #    print('FALSE')
+        #    return False
+        return self.conn is not None and self.conn.connectedWalletSubscription()
+
     def makeConnection(self):
         if len(self.servers) == 0:
             return
@@ -83,6 +92,9 @@ class ElectrumxAPI():
 
     def disconnect(self):
         self.conn.disconnect()
+
+    def disconnectSubscriptions(self):
+        self.conn.disconnectSubscriptions()
 
     def connect(self):
         if len(self.servers) == 0:

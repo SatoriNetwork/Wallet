@@ -42,6 +42,34 @@ class Electrumx(Connector):
         #    return False
         # return True
 
+    def connectedSubscription(self, conn: socket.socket) -> bool:
+        if conn is None:
+            conn = self.connectionWalletSubscription
+        if self.connectionWalletSubscription is None:
+            return False
+        try:
+            logging.debug('checking connected')
+            # Test the connection by sending a lightweight request
+            response = self.send('server.ping')
+            if response is None:
+                logging.debug('checking connected - False')
+                return False
+            logging.debug('checking connected - True')
+            return True
+        except Exception as e:
+            self.log.error(f"Connection check failed: {e}")
+            logging.debug(f'checking connected - {e}')
+            return False
+        # if self.send('server.ping') == None:
+        #    return False
+        # return True
+
+    def connectedWalletSubscription(self) -> bool:
+        return self.connectedSubscription(self.connectionWalletSubscription)
+
+    def connectedVaultSubscription(self) -> bool:
+        return self.connectedSubscription(self.connectionVaultSubscription)
+
     def handshake(self):
         try:
             name = f'Satori Neuron {time.time()}'
@@ -102,6 +130,8 @@ class Electrumx(Connector):
         return None
 
     def _receiveSubscriptions(self, conn: socket.socket, timeout: Union[int, None] = None) -> Union[dict, list, None]:
+        if conn is None:
+            conn = self.connectionWalletSubscription
         if timeout is not None:
             conn.settimeout(timeout)
         buffer = ''
@@ -148,7 +178,11 @@ class Electrumx(Connector):
             self.connection.send(payload)
             return self._receive(timeout=kwargs.get('timeout'))
 
-    def sendSubscription(self, conn: socket.socket, method, *args, **kwargs):
+    def sendSubscription(self, conn: socket.socket = None, method: str = None, *args, **kwargs):
+        if method is None:
+            return ''
+        if conn is None:
+            conn = self.connectionWalletSubscription
         payload = json.dumps({
             "jsonrpc": "2.0",
             "id": int(time.time()*1000),
