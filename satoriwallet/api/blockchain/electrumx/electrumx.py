@@ -26,6 +26,7 @@ class Electrumx(Connector):
         if self.connection is None:
             return False
         try:
+            logging.debug('checking connected')
             # Test the connection by sending a lightweight request
             response = self.send('server.ping')
             if response is None:
