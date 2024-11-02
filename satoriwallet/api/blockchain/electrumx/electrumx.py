@@ -30,10 +30,13 @@ class Electrumx(Connector):
             # Test the connection by sending a lightweight request
             response = self.send('server.ping')
             if response is None:
+                logging.debug('checking connected - False')
                 return False
+            logging.debug('checking connected - True')
             return True
         except Exception as e:
             self.log.error(f"Connection check failed: {e}")
+            logging.debug(f'checking connected - {e}')
             return False
         # if self.send('server.ping') == None:
         #    return False
