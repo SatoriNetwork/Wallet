@@ -99,6 +99,7 @@ class ElectrumxAPI():
     def connect(self):
         if len(self.servers) == 0:
             raise Exception("No servers available")
+        logging.debug('connected6')
         if self.connected():
             return self.conn
         tries = 0
@@ -106,6 +107,7 @@ class ElectrumxAPI():
             tries += 1
             try:
                 self.conn.connect()
+                logging.debug('connected7')
                 if self.connected():
                     self.handshake()
                     # self.makeSubscriptions()
@@ -121,8 +123,10 @@ class ElectrumxAPI():
 
     def handshake(self) -> bool:
         self._ensureConnected()
+        logging.debug('connected7')
         if self.connected() and self.lastHandshake != None and time.time() - self.lastHandshake < 60*60:
             return True
+        logging.debug('connected8')
         if not self.connected():
             raise Exception('unable to connect to electrumx servers')
         for _ in range(self.retryAttempts):
