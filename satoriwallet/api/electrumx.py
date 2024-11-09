@@ -54,6 +54,15 @@ class ElectrumxAPI():
         #    return False
         return self.conn is not None and self.conn.connected()
 
+    def connectedSubscriptions(self):
+        # if (
+        #    self.subscriptions.get('block') is not None and
+        #    self.lastBlockTime + 5*60 < time.time()
+        # ):
+        #    print('FALSE')
+        #    return False
+        return self.conn is not None and self.conn.connectedWalletSubscription()
+
     def makeConnection(self):
         if len(self.servers) == 0:
             return
@@ -84,9 +93,13 @@ class ElectrumxAPI():
     def disconnect(self):
         self.conn.disconnect()
 
+    def disconnectSubscriptions(self):
+        self.conn.disconnectSubscriptions()
+
     def connect(self):
         if len(self.servers) == 0:
             raise Exception("No servers available")
+        logging.debug('connected6')
         if self.connected():
             return self.conn
         tries = 0
@@ -94,6 +107,7 @@ class ElectrumxAPI():
             tries += 1
             try:
                 self.conn.connect()
+                logging.debug('connected7')
                 if self.connected():
                     self.handshake()
                     # self.makeSubscriptions()
@@ -102,13 +116,17 @@ class ElectrumxAPI():
 
     # Ensure if the connection is established or not
     def _ensureConnected(self):
+        logging.debug('in _ensureConnected')
         if not self.connected():
+            logging.debug('in _ensureConnected')
             self.connect()
 
     def handshake(self) -> bool:
         self._ensureConnected()
+        logging.debug('connected7')
         if self.connected() and self.lastHandshake != None and time.time() - self.lastHandshake < 60*60:
             return True
+        logging.debug('connected8')
         if not self.connected():
             raise Exception('unable to connect to electrumx servers')
         for _ in range(self.retryAttempts):
