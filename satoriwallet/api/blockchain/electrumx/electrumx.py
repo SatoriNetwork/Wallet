@@ -6,8 +6,6 @@ import time
 import threading
 from satoriwallet.api.blockchain.electrumx.connector import Connector
 
-logging.basicConfig(level=logging.INFO)
-
 
 class Electrumx(Connector):
     def __init__(self, *args, **kwargs):
