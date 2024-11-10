@@ -1,3 +1,4 @@
+from typing import Union
 import hashlib
 import base58
 
@@ -9,7 +10,7 @@ def isValidEvrmoreAddressBasic(address: str) -> bool:
     return bool(re.match(pattern, address))
 
 
-def base58_check_decode(address):
+def base58_check_decode(address: Union[str, bytes]) -> tuple[bool, Union[int, None]]:
     ''' Decode Base58Check address and return the payload and version byte. '''
     try:
         decoded = base58.b58decode(address)
@@ -26,7 +27,7 @@ def base58_check_decode(address):
         return False, None
 
 
-def isValidEvrmoreAddress(address):
+def isValidEvrmoreAddress(address: str) -> bool:
     ''' Validate Evrmore address using Base58Check. '''
     if not isValidEvrmoreAddressBasic(address):
         return False
@@ -40,3 +41,10 @@ def isValidEvrmoreAddress(address):
         return True
     else:
         return False  # Invalid version byte
+
+
+def validEvrmoreAddress(address: str) -> Union[str, None]:
+    ''' Validate Evrmore address using Base58Check. '''
+    if not isValidEvrmoreAddress(address):
+        return None
+    return address

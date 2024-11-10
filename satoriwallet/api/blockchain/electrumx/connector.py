@@ -28,7 +28,8 @@ class Connector:
         self.timeout = timeout
         self.network = network
         self.connection: socket.socket = None
-        self.connectionSubscriptions: socket.socket = None
+        self.connectionWalletSubscription: socket.socket = None
+        self.connectionVaultSubscription: socket.socket = None
         logging.debug(f'{self.host}:{self.port} {self.network}')
         self.connect()
 
@@ -57,10 +58,24 @@ class Connector:
         # except Exception as e:
         #    return False
 
+    def connectedWalletSubscription(self) -> bool:
+        if self.connectionWalletSubscription is None:
+            return False
+        return True
+
+    def connectedVaultSubscription(self) -> bool:
+        if self.connectionVaultSubscription is None:
+            return False
+        return True
+
     def connect(self):
         self.disconnect()
         self.connectConnection()
-        self.connectSubscriptions()
+
+    def connectSubscriptions(self):
+        self.disconnectSubscriptions()
+        self.connectWalletSubscription()
+        self.connectVaultSubscription()
 
     def reconnect(self):
         '''
@@ -71,12 +86,29 @@ class Connector:
             # Check if the socket is still connected
             logging.debug("reconnection")
             self.connection.send(b'')  # Sending a no-op to check connection
-            self.connectionSubscriptions.send(b'')
             return True
         except (socket.error, OSError):
             # Attempt to reconnect if the connection is lost
             logging.error("Connection lost, attempting to reconnect...")
             self.connect()  # Reconnect
+            return False  # Return False if reconnection fails
+
+    def reconnectSubscriptions(self):
+        '''
+        doesn't work. doesn't detect connection loss, and self.connect()
+        doesn't solve connection loss
+        '''
+        try:
+            # Check if the socket is still connected
+            logging.debug("reconnection")
+            self.connectionWalletSubscription.send(b'')
+            self.connectionVaultSubscription.send(b'')
+            return True
+        except (socket.error, OSError):
+            # Attempt to reconnect if the connection is lost
+            logging.error("Connection lost, attempting to reconnect...")
+            self.connectWalletSubscription()  # Reconnect
+            self.connectVaultSubscription()  # Reconnect
             return False  # Return False if reconnection fails
 
     def connectConnection(self):
@@ -110,16 +142,32 @@ class Connector:
                 f'error connecting to {self.host}:{str(self.port)} {e}')
             raise e
 
-    def connectSubscriptions(self):
-        self.connectionSubscriptions = socket.socket(
+    def connectWalletSubscription(self):
+        self.connectionWalletSubscription = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
-        self.connectionSubscriptions.settimeout(self.timeout)
+        self.connectionWalletSubscription.settimeout(self.timeout)
         if self.sslSubscription:
             context = ssl._create_unverified_context()
-            self.connectionSubscriptions = context.wrap_socket(
-                self.connectionSubscriptions, server_hostname=self.hostSubscription)
+            self.connectionWalletSubscription = context.wrap_socket(
+                self.connectionWalletSubscription, server_hostname=self.hostSubscription)
         try:
-            self.connectionSubscriptions.connect(
+            self.connectionWalletSubscription.connect(
+                (self.hostSubscription, self.portSubscription))
+        except Exception as e:
+            logging.error(
+                f'error connecting to {self.hostSubscription}:{str(self.portSubscription)} {e}')
+            raise e
+
+    def connectVaultSubscription(self):
+        self.connectionVaultSubscription = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM)
+        self.connectionVaultSubscription.settimeout(self.timeout)
+        if self.sslSubscription:
+            context = ssl._create_unverified_context()
+            self.connectionVaultSubscription = context.wrap_socket(
+                self.connectionVaultSubscription, server_hostname=self.hostSubscription)
+        try:
+            self.connectionVaultSubscription.connect(
                 (self.hostSubscription, self.portSubscription))
         except Exception as e:
             logging.error(
@@ -131,7 +179,10 @@ class Connector:
             self.connection.close()
         except Exception as _:
             pass
+
+    def disconnectSubscriptions(self):
         try:
-            self.connectionSubscriptions.close()
+            self.connectionWalletSubscription.close()
+            self.connectionVaultSubscription.close()
         except Exception as _:
             pass

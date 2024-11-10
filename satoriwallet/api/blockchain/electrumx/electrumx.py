@@ -8,32 +8,73 @@ from satoriwallet.api.blockchain.electrumx.connector import Connector
 
 logging.basicConfig(level=logging.INFO)
 
+
 class Electrumx(Connector):
     def __init__(self, *args, **kwargs):
         self.log = logging.getLogger(type(self).__name__)
         super(type(self), self).__init__(*args, **kwargs)
         self.lock = threading.Lock()  # Lock for general connection
-        self.subscriptionLock = threading.Lock()  # Lock for subscriptions
+        self.walletSubscriptionLock = threading.Lock()  # Lock for subscriptions
+        self.vaultSubscriptionLock = threading.Lock()  # Lock for subscriptions
         self.lastHandshake = 0
         self.handshaked = None
         self.handshake()
+
+    def connect(self) -> bool:
+        super().connect()
+        super().connectSubscriptions()
 
     def connected(self) -> bool:
         if self.connection is None:
             return False
         try:
-            # self.connection.settimeout(10)
+            logging.debug('checking connected')
+            # Test the connection by sending a lightweight request
+            response = self.send('server.ping')
+            if response is None:
+                logging.debug('checking connected - False')
+                return False
+            logging.debug('checking connected - True')
             return True
         except Exception as e:
-            self.log.error(f"error setting timeout {e}")
+            self.log.error(f"Connection check failed: {e}")
+            logging.debug(f'checking connected - {e}')
             return False
         # if self.send('server.ping') == None:
         #    return False
         # return True
 
+    def connectedSubscription(self, conn: socket.socket) -> bool:
+        if conn is None:
+            conn = self.connectionWalletSubscription
+        if self.connectionWalletSubscription is None:
+            return False
+        try:
+            logging.debug('checking connected')
+            # Test the connection by sending a lightweight request
+            response = self.send('server.ping')
+            if response is None:
+                logging.debug('checking connected - False')
+                return False
+            logging.debug('checking connected - True')
+            return True
+        except Exception as e:
+            self.log.error(f"Connection check failed: {e}")
+            logging.debug(f'checking connected - {e}')
+            return False
+        # if self.send('server.ping') == None:
+        #    return False
+        # return True
+
+    def connectedWalletSubscription(self) -> bool:
+        return self.connectedSubscription(self.connectionWalletSubscription)
+
+    def connectedVaultSubscription(self) -> bool:
+        return self.connectedSubscription(self.connectionVaultSubscription)
+
     def handshake(self):
         try:
-            name = f'Satori Node {time.time()}'
+            name = f'Satori Neuron {time.time()}'
             assetApiVersion = '1.10'
             logging.debug(f'handshake {name} {assetApiVersion}')
             self.handshaked = self.send(
@@ -41,6 +82,16 @@ class Electrumx(Connector):
                 name,
                 assetApiVersion)
             self.lastHandshake = time.time()
+            self.handshakedWalletSubscription = self.sendWalletSubscription(
+                'server.version',
+                f'Satori Wallet {time.time()}',
+                assetApiVersion)
+            self.handshakedVaultSubscription = self.sendVaultSubscription(
+                'server.version',
+                f'Satori Vault {time.time()}',
+                assetApiVersion)
+            self.lastHandshakeWalletSubscription = time.time()
+            self.lastHandshakeVaultSubscription = time.time()
             return True
         except Exception as e:
             logging.error(f'error in handshake initial {e}')
@@ -54,6 +105,8 @@ class Electrumx(Connector):
                 try:
                     raw = self.connection.recv(1024 * 16).decode('utf-8')
                     buffer += raw
+                    if raw == '':
+                        return None
                     if '\n' in raw:
                         # Split on the first newline to handle multiple messages
                         message, _, buffer = buffer.partition('\n')
@@ -78,16 +131,16 @@ class Electrumx(Connector):
             self.connection.settimeout(None)
         return None
 
-    def _receiveSubscriptions(self, timeout: Union[int, None] = None) -> Union[dict, list, None]:
-        logging.debug(
-            f"_receiveSubscriptions started {self.connectionSubscriptions}")
+    def _receiveSubscriptions(self, conn: socket.socket, timeout: Union[int, None] = None) -> Union[dict, list, None]:
+        if conn is None:
+            conn = self.connectionWalletSubscription
         if timeout is not None:
-            self.connectionSubscriptions.settimeout(timeout)
+            conn.settimeout(timeout)
         buffer = ''
         try:
             while True:
                 try:
-                    raw = self.connectionSubscriptions.recv(
+                    raw = conn.recv(
                         1024 * 16).decode('utf-8')
                     buffer += raw
                     if '\n' in raw:
@@ -111,55 +164,69 @@ class Electrumx(Connector):
                     return None
         finally:
             # Reset the timeout to blocking mode
-            self.connectionSubscriptions.settimeout(None)
+            conn.settimeout(None)
         return None
 
-    def send(self, method, *args, **kwargs):
-        payload = json.dumps(
-            {
-                "jsonrpc": "2.0",
-                "id": int(time.time()*1000),
-                "method": method,
-                "params": args
-            }
-        ) + '\n'
+    def send(self, method: str, *args, **kwargs):
+        payload = json.dumps({
+            "jsonrpc": "2.0",
+            "id": int(time.time()*1000),
+            "method": method,
+            "params": args
+        }) + '\n'
         payload = payload.encode()
         self.log.log(5, "send {} {}".format(method, args))
         with self.lock:
             self.connection.send(payload)
-            return self._receive()
+            return self._receive(timeout=kwargs.get('timeout'))
 
-    def sendSubscription(self, method, *args, **kwargs):
-        payload = json.dumps(
-            {
-                "jsonrpc": "2.0",
-                "id": int(time.time()*1000),
-                "method": method,
-                "params": args
-            }
-        ) + '\n'
+    def sendSubscription(self, conn: socket.socket = None, method: str = None, *args, **kwargs):
+        if method is None:
+            return ''
+        if conn is None:
+            conn = self.connectionWalletSubscription
+        payload = json.dumps({
+            "jsonrpc": "2.0",
+            "id": int(time.time()*1000),
+            "method": method,
+            "params": args
+        }) + '\n'
         payload = payload.encode()
         self.log.log(5, "send {} {}".format(method, args))
-        with self.subscriptionLock:
-            self.connectionSubscriptions.send(payload)
-            return self._receiveSubscriptions()
+        conn.send(payload)
+        return f'subscribed to {payload}'
 
-    def receive_notifications(self):
+    def sendWalletSubscription(self, method, *args, **kwargs):
+        with self.walletSubscriptionLock:
+            return self.sendSubscription(self.connectionWalletSubscription, method, *args, **kwargs)
+
+    def sendVaultSubscription(self, method, *args, **kwargs):
+        with self.vaultSubscriptionLock:
+            return self.sendSubscription(self.connectionVaultSubscription, method, *args, **kwargs)
+
+    def receiveNotifications(self, conn: socket.socket):
         """
         Continuously listens for notifications from the server.
         """
         while True:
             try:
-                update = self._receiveSubscriptions()
-                logging.debug(f'update: {update}')
+                update = self._receiveSubscriptions(conn)
+                logging.debug('update: {}'.format(update))
                 if update and 'method' in update:
-                    if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe']:
+                    if update['method'] in ['blockchain.scripthash.subscribe', 'blockchain.headers.subscribe', 'blockchain.scripthash.unsubscribe']:
                         yield update
                     else:
-                        logging.debug(f"Received unknown method: {update['method']}")
+                        logging.debug(
+                            f"Received unknown method: {update['method']}")
                 elif update is None:
                     logging.debug("Received None update, breaking loop")
                     # break  # Handle the case where the connection might have dropped
             except Exception as e:
-                logging.error(f"Error in receive_notifications: {str(e)}")
+                logging.error(f"Error in receiveNotifications: {str(e)}")
                 break
+
+    def receiveWalletNotifications(self):
+        return self.receiveNotifications(self.connectionWalletSubscription)
+
+    def receiveVaultNotifications(self):
+        return self.receiveNotifications(self.connectionVaultSubscription)

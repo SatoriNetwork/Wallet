@@ -32,8 +32,7 @@ class ElectrumxAPI():
         self.conn = connection
         self.lastHandshake = time.time()
         self.transactions = None
-        self.subscriptions = {}
-        self.stop_all_subscriptions = Event()
+        self.stopAllSubscriptions = Event()
         self.balance = None
         self.stats = None
         self.banner = None
@@ -47,12 +46,22 @@ class ElectrumxAPI():
             self.conn = self.makeConnection()
 
     def connected(self):
-        if (
-            self.subscriptions.get('block') is not None and
-            self.lastBlockTime + 5*60 < time.time()
-        ):
-            return False
+        # if (
+        #    self.subscriptions.get('block') is not None and
+        #    self.lastBlockTime + 5*60 < time.time()
+        # ):
+        #    print('FALSE')
+        #    return False
         return self.conn is not None and self.conn.connected()
+
+    def connectedSubscriptions(self):
+        # if (
+        #    self.subscriptions.get('block') is not None and
+        #    self.lastBlockTime + 5*60 < time.time()
+        # ):
+        #    print('FALSE')
+        #    return False
+        return self.conn is not None and self.conn.connectedWalletSubscription()
 
     def makeConnection(self):
         if len(self.servers) == 0:
@@ -84,9 +93,13 @@ class ElectrumxAPI():
     def disconnect(self):
         self.conn.disconnect()
 
+    def disconnectSubscriptions(self):
+        self.conn.disconnectSubscriptions()
+
     def connect(self):
         if len(self.servers) == 0:
             raise Exception("No servers available")
+        logging.debug('connected6')
         if self.connected():
             return self.conn
         tries = 0
@@ -94,6 +107,7 @@ class ElectrumxAPI():
             tries += 1
             try:
                 self.conn.connect()
+                logging.debug('connected7')
                 if self.connected():
                     self.handshake()
                     # self.makeSubscriptions()
@@ -102,13 +116,17 @@ class ElectrumxAPI():
 
     # Ensure if the connection is established or not
     def _ensureConnected(self):
+        logging.debug('in _ensureConnected')
         if not self.connected():
+            logging.debug('in _ensureConnected')
             self.connect()
 
     def handshake(self) -> bool:
         self._ensureConnected()
+        logging.debug('connected7')
         if self.connected() and self.lastHandshake != None and time.time() - self.lastHandshake < 60*60:
             return True
+        logging.debug('connected8')
         if not self.connected():
             raise Exception('unable to connect to electrumx servers')
         for _ in range(self.retryAttempts):
@@ -173,7 +191,10 @@ class ElectrumxAPI():
             if not self.handshake():
                 raise Exception("Handshake failed")
         try:
-            response = self.conn.sendSubscription(method, *params)
+            if self.type == 'wallet':
+                response = self.conn.sendWalletSubscription(method, *params)
+            else:
+                response = self.conn.sendVaultSubscription(method, *params)
             return ElectrumxAPI.interpret(response)
         except socket.timeout as e:
             logging.error(f"Timeout during {method}: {str(e)}")
@@ -270,7 +291,7 @@ class ElectrumxAPI():
                 'blockchain.asset.list_addresses_by_asset', False, 'SATORI', False, 1000, i)
             if target_address is not None and target_address in response.keys():
                 return {target_address: response[target_address]}
-            addresses.update(response)
+            addresses = {**addresses, **response}
             if len(response) < 1000:
                 break
             i += 1000
@@ -284,13 +305,13 @@ class ElectrumxAPI():
                 'blockchain.transaction.broadcast', True, raw_tx)
         return self.sentTx
 
+    def cancelSubscriptions(self):
+        self.stopAllSubscriptions.set()
+        self.stopScripthashSubscription()
+        self.stopAllSubscriptions.clear()
+
     # make all subscriptions - handles cleaning up stale subscriptions
     def makeSubscriptions(self):
-        if self.subscriptions.get('scripthash') != None or self.subscriptions.get('block') != None:
-            self.stop_all_subscriptions.set()
-            self.stopScripthashSubscription()
-            self.stopHeaderSubscription()
-        self.stop_all_subscriptions.clear()
         self.subscribeScriptHash()
         if self.type == 'vault':
             self.subscribeBlockHeaders()
@@ -300,11 +321,11 @@ class ElectrumxAPI():
         """
         Subscribe to the scripthash and start listening for updates.
         """
-        if not self.connected():
-            raise Exception("Not connected to Electrumx server.")
+        # if not self.connected():
+        #    raise Exception("Not connected to Electrumx server.")
         # Ensure the connection is established and handshake is performed
-        if not self.handshake():
-            raise Exception("Not connected to Electrumx server.")
+        # if not self.handshake():
+        #    raise Exception("Not connected to Electrumx server.")
         # Subscribe to the scripthash
         initial_status = self._sendSubscriptionRequest(
             'blockchain.scripthash.subscribe', False, self.scripthash)
@@ -316,26 +337,29 @@ class ElectrumxAPI():
         """
         Subscribe to the scripthash and start listening for updates.
         """
-        if not self.connected():
-            raise Exception("Not connected to Electrumx server.")
+        # if not self.connected():
+        #    raise Exception("Not connected to Electrumx server.")
         # Ensure the connection is established and handshake is performed
-        if not self.handshake():
-            raise Exception("Not connected to Electrumx server.")
+        # if not self.handshake():
+        #    raise Exception("Not connected to Electrumx server.")
         # Subscribe to the headers for new block
         initial_status_header = self._sendSubscriptionRequest(
             'blockchain.headers.subscribe', False)
         logging.debug(f"Initial status for header: {initial_status_header}")
 
-    # _processNotifications method to listening for updates
-    def _processNotifications(self):
+    def processNotifications(self):
         """
         Processes incoming notifications for the subscribed scripthash and headers.
         """
         logging.debug("_processNotifications started")
         try:
-            for notification in self.conn.receive_notifications():
+            for notification in (
+                self.conn.receiveWalletNotifications()
+                if self.type == 'wallet'
+                else self.conn.receiveVaultNotifications()
+            ):
                 logging.debug(f"Received notification {notification}")
-                if self.stop_all_subscriptions.is_set():
+                if self.stopAllSubscriptions.is_set():
                     logging.debug("Stop event set, breaking loop")
                     break
                 if 'method' in notification:
@@ -366,41 +390,12 @@ class ElectrumxAPI():
     # unsubscribe from the Electrumx server
     # Stop the event and thread
     def stopScripthashSubscription(self):
-        """
-        Stops the subscription thread.
-        """
-        logging.debug(
-            f"Stop scripthash subscription started {self.subscriptions['scripthash']}")
-        if self.subscriptions['scripthash'] and self.subscriptions['scripthash'].is_alive():
-            # Unsubscribe from the scripthash
-            try:
-                self._sendSubscriptionRequest(
-                    'blockchain.scripthash.unsubscribe', True, self.scripthash)
-                logging.debug(
-                    f"Unsubscribed from scripthash {self.scripthash}")
-            except Exception as e:
-                logging.error(
-                    f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
-            self.subscriptions['scripthash'].join()
+        ''' Stops the subscription thread. '''
+        try:
+            self._sendSubscriptionRequest(
+                'blockchain.scripthash.unsubscribe', False, self.scripthash)
             logging.debug(
-                f"Stopped subscription thread for scripthash {self.scripthash}")
-
-    # Method to stop subscription
-    # unsubscribe from the Electrumx server
-    # Stop the event and thread
-    def stopHeaderSubscription(self):
-        """
-        Stops the subscription thread.
-        """
-        logging.debug(
-            f"Stop header subscription started {self.subscriptions['block']}")
-        if self.subscriptions['block'] and self.subscriptions['block'].is_alive():
-            # Unsubscribe from the header subscription
-            try:
-                self._sendSubscriptionRequest(
-                    'blockchain.headers.unsubscribe', True)
-                logging.debug("Unsubscribed from headers")
-            except Exception as e:
-                logging.error(f"Error while unsubscribing from headers: {str(e)}")
-            self.subscriptions['block'].join()
-            logging.debug("Stopped header subscription thread")
+                f"Unsubscribed from scripthash {self.scripthash}")
+        except Exception as e:
+            logging.error(
+                f"Error while unsubscribing from scripthash {self.scripthash}: {str(e)}")
