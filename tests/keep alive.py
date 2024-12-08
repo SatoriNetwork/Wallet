@@ -1,6 +1,6 @@
 import os
-from satorilib.api.disk import Disk
-from satorilib.api.wallet import RavencoinWallet, EvrmoreWallet
+from satorilib.disk import Disk
+from satorilib.wallet import RavencoinWallet, EvrmoreWallet
 from satorineuron import config
 Disk.setConfig(config)
 w = EvrmoreWallet(walletPath=config.walletPath('wallet.yaml'))
