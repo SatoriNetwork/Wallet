@@ -4,7 +4,7 @@ import socket
 import json
 import time
 import threading
-from satoriwallet.api.blockchain.electrumx.connector import Connector
+from satorilib.wallet.api.blockchain.electrumx.connector import Connector
 
 
 class Electrumx(Connector):

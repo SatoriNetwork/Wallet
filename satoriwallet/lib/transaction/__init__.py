@@ -1,1 +1,1 @@
-from satoriwallet.lib.transaction.utils import TxUtils, AssetTransaction, Validate
+from satorilib.wallet.lib.transaction.utils import TxUtils, AssetTransaction, Validate

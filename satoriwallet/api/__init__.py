@@ -1,2 +1,2 @@
-from satoriwallet.api.blockchain.electrumx.electrumx import Electrumx
-from satoriwallet.api.electrumx import ElectrumxAPI
+from satorilib.wallet.api.blockchain.electrumx.electrumx import Electrumx
+from satorilib.wallet.api.electrumx import ElectrumxAPI

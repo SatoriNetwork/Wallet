@@ -1,5 +1,5 @@
-from satoriwallet import api
-from satoriwallet.api import Electrumx, ElectrumxAPI
-from satoriwallet.lib import ravencoin, evrmore
-from satoriwallet.lib.connection import authPayload
-from satoriwallet.lib.transaction import TxUtils, AssetTransaction, Validate
+from satorilib.wallet import api
+from satorilib.wallet.api import Electrumx, ElectrumxAPI
+from satorilib.wallet.lib import ravencoin, evrmore
+from satorilib.wallet.lib.connection import authPayload
+from satorilib.wallet.lib.transaction import TxUtils, AssetTransaction, Validate

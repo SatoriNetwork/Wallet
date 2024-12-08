@@ -1,1 +1,1 @@
-from satoriwallet.lib.connection import authPayload
+from satorilib.wallet.lib.connection import authPayload

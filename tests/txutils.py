@@ -3,7 +3,7 @@ from typing import Union
 import unittest
 
 import base58
-from satoriwallet import TxUtils
+from satorilib.wallet import TxUtils
 
 
 class TestTxUtils(unittest.TestCase):

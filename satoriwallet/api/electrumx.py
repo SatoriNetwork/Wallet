@@ -4,7 +4,7 @@ from typing import Union, Dict
 from threading import Thread, Event, Lock
 import socket
 import time
-from satoriwallet.api.blockchain import Electrumx
+from satorilib.wallet.api.blockchain import Electrumx
 
 logging.basicConfig(level=logging.INFO)
 

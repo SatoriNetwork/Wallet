@@ -1,6 +1,6 @@
 from typing import Union
 
-from satoriwallet.lib.ethereum.valid_eth import isValidEthereumAddress
+from satorilib.wallet.lib.ethereum.valid_eth import isValidEthereumAddress
 
 
 class TransactionStruct():

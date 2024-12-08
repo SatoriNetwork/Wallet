@@ -1,2 +1,2 @@
-from satoriwallet.lib.evrmore.verify import verify
-from satoriwallet.lib.evrmore.sign import signMessage
+from satorilib.wallet.evrmore.verify import verify
+from satorilib.wallet.lib.evrmore.sign import signMessage

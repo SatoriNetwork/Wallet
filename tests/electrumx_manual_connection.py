@@ -1,5 +1,5 @@
-from satoriwallet.lib.structs import TransactionStruct
-from satoriwallet.api.blockchain import Electrumx
+from satorilib.wallet.lib.structs import TransactionStruct
+from satorilib.wallet.api.blockchain import Electrumx
 import time
 import random
 import json

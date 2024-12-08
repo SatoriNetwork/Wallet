@@ -1,2 +1,2 @@
-from satoriwallet.lib.ravencoin.verify import verify
-from satoriwallet.lib.ravencoin.sign import signMessage
+from satorilib.wallet.lib.ravencoin.verify import verify
+from satorilib.wallet.lib.ravencoin.sign import signMessage
