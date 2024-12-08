@@ -11,8 +11,8 @@ class TxUtils():
     def estimatedFee(inputCount: int = 0, outputCount: int = 0, feeRate: int = 150000) -> int:
         '''
         0.00150000 rvn per item as simple over-estimate
-        this fee is on a per input/output basis and it should cover a asset 
-        output which is larger than a currency output. therefore it should 
+        this fee is on a per input/output basis and it should cover a asset
+        output which is larger than a currency output. therefore it should
         always be sufficient for our purposes. usually we're sending 1 asset
         vin and 1 asset vout, and 1 currency vin and 1 currency vout.
         '''
@@ -22,15 +22,15 @@ class TxUtils():
     def estimatedFeeRecursive(txHex: str, feeRate: int = 1100):
         '''
         this assumes you've already created a transaction with the and can
-        inspect the size of it to estimate the fee, therere it implies a 
+        inspect the size of it to estimate the fee, therere it implies a
         recursive opperation to create the transaction, because the fee must
         be chosen before the transaction is created. so you would build the
         transaction at least twice, but the fee can be much more optimized.
         1.1 standard * 1000 * 192 bytes = 211,200 sats == 0.00211200 rvn
         see example transaction: https://rvn.cryptoscope.io/tx/?txid=
         3a880d09258075635e1565c06dce3f0091a67da987a63140a60f1d8f80a6625a
-        we could even base this off of some reasonable upper bound and the 
-        minimum relay fee specified by the electurmx server using 
+        we could even base this off of some reasonable upper bound and the
+        minimum relay fee specified by the electurmx server using
         blockchain.relayfee(). however, since I'm not willing to write the
         recursive process we're not going to use this function yet.
         feeRate = 1100 # 0.00001100 rvn per byte
@@ -78,9 +78,9 @@ class TxUtils():
 
     @staticmethod
     def roundDownToDivisibility(amount: float, divisibility: int = 8) -> Union[int, float]:
-        ''' 
-        This function truncates the given amount to the allowed number of 
-        decimal places as defined by the asset's divisibility. 
+        '''
+        This function truncates the given amount to the allowed number of
+        decimal places as defined by the asset's divisibility.
         It returns the truncated amount.
         '''
         if divisibility == 0:
@@ -185,7 +185,11 @@ class Validate():
     ''' heuristics '''
 
     @staticmethod
-    def address(address: str, currency: str) -> str:
+    def address(address: str, currency: str) -> bool:
         return (
             (currency.lower() == 'rvn' and address.startswith('R') and len(address) == 34) or
             (currency.lower() == 'evr' and address.startswith('E') and len(address) == 34))
+
+    @staticmethod
+    def ethAddress(address: str) -> bool:
+        return address.startswith("0x") and len(address) == 42

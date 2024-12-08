@@ -6,8 +6,8 @@ import json
 import socket
 from typing import Union
 from satorineuron import config
-from satorilib.api.disk import Cache  # Disk
-from satorilib.api.wallet import EvrmoreWallet
+from satorilib.disk import Cache  # Disk
+from satorilib.wallet import EvrmoreWallet
 Cache.setConfig(config)
 _evrmoreWallet = EvrmoreWallet(
     config.walletPath('wallet.yaml'),
